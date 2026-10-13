@@ -204,7 +204,7 @@ main {
   min-height: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding: 6px 0 6px 6px;
+  padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 6px;
