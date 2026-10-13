@@ -1,0 +1,461 @@
+:root {
+  --bg: #14171c;
+  --panel: #1c2027;
+  --card: #232831;
+  --line: #303640;
+  --text: #e6e9ee;
+  --muted: #8d97a5;
+  --accent: #5aa9ff;
+  --like: #ff5d7d;
+  --repost: #3fcf8e;
+  --error: #ff8a7a;
+  color-scheme: dark;
+  font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--line);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  color: #06121f;
+  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #7dbcff;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 12px;
+}
+
+.error {
+  color: var(--error);
+}
+
+.splash {
+  padding: 48px;
+  text-align: center;
+}
+
+.app {
+  display: flex;
+  height: 100%;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--line);
+}
+
+.sidebar button {
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  padding: 0;
+}
+
+.sidebar .spacer {
+  flex: 1;
+}
+
+main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.banner {
+  padding: 8px 16px;
+  background: #4a2a22;
+  color: #ffd9d2;
+}
+
+.columns {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  overflow-x: auto;
+}
+
+.column {
+  flex: 0 0 340px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+  border-radius: 12px;
+}
+
+.column header {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.column .title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.column h2 {
+  margin: 0;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.column .tools {
+  display: flex;
+  flex: none;
+  opacity: 0.6;
+}
+
+.column .tools button {
+  padding: 0 6px;
+}
+
+.health {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.more {
+  align-self: center;
+  border-color: var(--line);
+}
+
+.post {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+
+.context {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.byline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.25;
+}
+
+.names > *,
+.quote .byline > strong,
+.quote .byline > .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+}
+
+.avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--line);
+  object-fit: cover;
+}
+
+.avatar.small {
+  width: 20px;
+  height: 20px;
+}
+
+.body {
+  white-space: pre-wrap;
+}
+
+.images {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.images.n1 {
+  grid-template-columns: 1fr;
+}
+
+.images img,
+.video img,
+.card img {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.images img {
+  max-height: 320px;
+}
+
+.images.n2 img,
+.images.n3 img,
+.images.n4 img {
+  aspect-ratio: 1;
+}
+
+.video {
+  position: relative;
+  display: block;
+  min-height: 80px;
+  background: #000;
+  border-radius: 8px;
+}
+
+.video .play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  color: #fff;
+  text-shadow: 0 0 8px #000;
+}
+
+.card {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: inherit;
+  overflow: hidden;
+}
+
+.card:hover {
+  text-decoration: none;
+  border-color: var(--muted);
+}
+
+.card img {
+  border-radius: 0;
+  max-height: 180px;
+}
+
+.card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.card-desc {
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.quote {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 -8px -4px;
+  color: var(--muted);
+}
+
+.actions button {
+  min-width: 52px;
+  text-align: left;
+}
+
+.actions .on.like {
+  color: var(--like);
+}
+
+.actions .on.repost {
+  color: var(--repost);
+}
+
+.actions .error {
+  font-size: 12px;
+}
+
+.notif-icon {
+  color: var(--like);
+  width: 20px;
+  text-align: center;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 60%);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.modal {
+  width: min(460px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.modal p {
+  margin: 0;
+}
+
+.modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.modal input,
+.modal select,
+.modal textarea {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  width: 100%;
+}
+
+.modal textarea {
+  resize: vertical;
+}
+
+.modal :is(input, select, textarea):focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.buttons {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.buttons button {
+  padding: 6px 14px;
+  border-color: var(--line);
+}
