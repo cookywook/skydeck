@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import {
   AppBskyEmbedExternal,
   AppBskyEmbedImages,
@@ -241,12 +241,30 @@ function Actions({ post }: { post: PostView }) {
   )
 }
 
-export function PostCard({ item, now }: { item: Extract<Item, { kind: 'post' }>; now: number }) {
+/** Opens the thread unless the click was on a link or button, or was the end of a text selection. */
+function useOpenThread(uri: string | undefined) {
+  const { openThread } = useApp()
+  return (e: MouseEvent) => {
+    if (!uri || (e.target as Element).closest('a, button')) return
+    if (window.getSelection()?.toString()) return
+    openThread(uri)
+  }
+}
+
+interface PostCardProps {
+  item: Extract<Item, { kind: 'post' }>
+  now: number
+  /** The post a thread view is centred on: highlighted, and not clickable. */
+  current?: boolean
+}
+
+export function PostCard({ item, now, current }: PostCardProps) {
   const { post } = item
   const record = post.record as PostRecord
   const href = postUrl(post)
+  const open = useOpenThread(current ? undefined : post.uri)
   return (
-    <article className="post">
+    <article className={current ? 'post current' : 'post clickable'} onClick={open}>
       {item.repostBy && <div className="context">⟳ Reposted by {displayName(item.repostBy)}</div>}
       {item.label && (
         <div className="context">
@@ -283,8 +301,9 @@ const NOTIF_TEXT: Record<string, string> = {
 export function NotifCard({ item, now }: { item: Extract<Item, { kind: 'notif' }>; now: number }) {
   const [first, ...rest] = item.authors
   const subject = item.subject?.record as PostRecord | undefined
+  const open = useOpenThread(item.subject?.uri)
   return (
-    <article className="post notif">
+    <article className={item.subject ? 'post notif clickable' : 'post notif'} onClick={open}>
       <div className="byline">
         <span className={`notif-icon ${item.reason.includes('like') ? 'like' : ''}`}>
           {item.reason.includes('like') ? '♥' : item.reason.includes('repost') ? '⇄' : '＋'}

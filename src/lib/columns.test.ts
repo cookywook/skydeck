@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { AppBskyFeedDefs, AppBskyNotificationListNotifications } from '@atproto/api'
-import { appendItems, groupNotifications, mergeItems, parseFeedRef, relativeTime, subjectUris, type Item } from './columns'
+import {
+  appendItems,
+  groupNotifications,
+  mergeItems,
+  parseFeedRef,
+  relativeTime,
+  showInHome,
+  subjectUris,
+  type Item,
+} from './columns'
+import { flattenThread } from './thread'
 import { defaultColumns, exportColumns, parseColumns } from './settings'
 
 type Notification = AppBskyNotificationListNotifications.Notification
@@ -136,5 +146,74 @@ describe('column settings', () => {
   it('rejects malformed files', () => {
     expect(() => parseColumns('{"columns":[{"kind":"feed"}]}')).toThrow(/Column 1/)
     expect(() => parseColumns('{}')).toThrow(/No columns/)
+  })
+})
+
+describe('showInHome', () => {
+  const ME = 'did:plc:me'
+  type Who = 'followed' | 'stranger' | 'me'
+  const author = (who: Who) => ({
+    did: who === 'me' ? ME : `did:plc:${who}`,
+    handle: `${who}.test`,
+    viewer: who === 'followed' ? { following: 'at://follow' } : {},
+  })
+  const by = (who: Who): PostView => ({ ...post(`${POST}${who}`), author: author(who) })
+  const reply = (from: Who, to: Who) => ({
+    post: by(from),
+    reply: { root: { $type: 'app.bsky.feed.defs#postView' as const, ...by(to) }, parent: { $type: 'app.bsky.feed.defs#postView' as const, ...by(to) } },
+  })
+
+  it('shows posts that are not replies', () => {
+    expect(showInHome({ post: by('followed') }, ME)).toBe(true)
+  })
+
+  it('shows a reply only when both people are followed', () => {
+    expect(showInHome(reply('followed', 'followed'), ME)).toBe(true)
+    expect(showInHome(reply('followed', 'stranger'), ME)).toBe(false)
+    expect(showInHome(reply('stranger', 'followed'), ME)).toBe(false)
+  })
+
+  it('counts your own posts as followed', () => {
+    expect(showInHome(reply('followed', 'me'), ME)).toBe(true)
+    expect(showInHome(reply('me', 'followed'), ME)).toBe(true)
+    expect(showInHome(reply('me', 'stranger'), ME)).toBe(false)
+  })
+
+  it('hides a reply to a post that is gone or blocked', () => {
+    const v = reply('followed', 'followed')
+    const gone = { $type: 'app.bsky.feed.defs#notFoundPost' as const, uri: 'at://x', notFound: true as const }
+    expect(showInHome({ ...v, reply: { ...v.reply, parent: gone } }, ME)).toBe(false)
+  })
+
+  it('always shows reposts', () => {
+    const repost = {
+      ...reply('stranger', 'stranger'),
+      reason: { $type: 'app.bsky.feed.defs#reasonRepost' as const, by: author('followed'), indexedAt: '2026-10-13T12:00:00Z' },
+    }
+    expect(showInHome(repost, ME)).toBe(true)
+  })
+})
+
+describe('flattenThread', () => {
+  const node = (uri: string, extra: object = {}) => ({ $type: 'app.bsky.feed.defs#threadViewPost', post: post(uri), ...extra })
+
+  it('lists parents oldest first, then the post, then direct replies', () => {
+    const thread = node('c', {
+      parent: node('b', { parent: node('a') }),
+      replies: [node('d'), { $type: 'app.bsky.feed.defs#blockedPost', uri: 'x', blocked: true }, node('e')],
+    })
+    const flat = flattenThread(thread)!
+    expect(flat.parents.map((p) => p?.uri)).toEqual(['a', 'b'])
+    expect(flat.post.uri).toBe('c')
+    expect(flat.replies.map((p) => p.uri)).toEqual(['d', 'e'])
+  })
+
+  it('marks an unavailable parent and stops there', () => {
+    const thread = node('c', { parent: node('b', { parent: { $type: 'app.bsky.feed.defs#notFoundPost', uri: 'a', notFound: true } }) })
+    expect(flattenThread(thread)!.parents.map((p) => p?.uri ?? null)).toEqual([null, 'b'])
+  })
+
+  it('returns null when the post itself is unavailable', () => {
+    expect(flattenThread({ $type: 'app.bsky.feed.defs#notFoundPost', uri: 'a', notFound: true })).toBeNull()
   })
 })

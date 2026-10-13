@@ -44,7 +44,8 @@ export async function fetchColumn(agent: AtpAgent, c: ColumnConfig, cursor?: str
   switch (c.kind) {
     case 'home': {
       const { data } = await agent.getTimeline({ limit: PAGE, cursor })
-      return { items: data.feed.map(feedItem), cursor: data.cursor }
+      const myDid = agent.session?.did
+      return { items: data.feed.filter((v) => showInHome(v, myDid)).map(feedItem), cursor: data.cursor }
     }
     case 'feed': {
       const { data } = await agent.app.bsky.feed.getFeed({ feed: c.feed, limit: PAGE, cursor })
@@ -65,6 +66,17 @@ export async function fetchColumn(agent: AtpAgent, c: ColumnConfig, cursor?: str
       return { items: groupNotifications(data.notifications, posts), cursor: data.cursor }
     }
   }
+}
+
+/**
+ * Home hides a reply unless you follow both its author and the person being
+ * replied to (your own posts count as followed). Reposts are always shown.
+ */
+export function showInHome(v: AppBskyFeedDefs.FeedViewPost, myDid?: string): boolean {
+  if (!v.reply || AppBskyFeedDefs.isReasonRepost(v.reason)) return true
+  const followed = (a: { did: string; viewer?: { following?: string } }) => a.did === myDid || !!a.viewer?.following
+  const parent = v.reply.parent
+  return AppBskyFeedDefs.isPostView(parent) && followed((parent as PostView).author) && followed(v.post.author)
 }
 
 function feedItem(v: AppBskyFeedDefs.FeedViewPost): Item {

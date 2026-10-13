@@ -9,6 +9,7 @@ export type Session = SessionManager<AtpAgent>
 export interface AppContext {
   session: Session
   compose(replyTo?: AppBskyFeedDefs.PostView): void
+  openThread(uri: string): void
 }
 
 export const Ctx = createContext<AppContext | null>(null)

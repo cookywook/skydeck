@@ -1,0 +1,62 @@
+import { useEffect, useRef, useState } from 'react'
+import { useApp, useNow } from '../hooks'
+import { flattenThread, type Thread as ThreadData } from '../lib/thread'
+import { Modal } from './Dialogs'
+import { PostCard } from './PostCard'
+
+export function Thread({ uri, onClose }: { uri: string; onClose(): void }) {
+  const { session } = useApp()
+  const [thread, setThread] = useState<ThreadData | null>(null)
+  const [error, setError] = useState('')
+  const focused = useRef<HTMLDivElement>(null)
+  const now = useNow(30_000)
+
+  useEffect(() => {
+    let live = true
+    setThread(null)
+    setError('')
+    session.agent
+      .getPostThread({ uri, depth: 1, parentHeight: 30 })
+      .then((res) => {
+        if (!live) return
+        const flat = flattenThread(res.data.thread)
+        if (flat) setThread(flat)
+        else setError('This post is unavailable.')
+      })
+      .catch((e) => live && setError(e instanceof Error ? e.message : 'Could not load the thread.'))
+    return () => {
+      live = false
+    }
+  }, [session, uri])
+
+  // Start at the post that was clicked; what it replies to is just above.
+  useEffect(() => {
+    if (thread?.parents.length) focused.current?.scrollIntoView({ block: 'center' })
+  }, [thread])
+
+  return (
+    <Modal title="Thread" onClose={onClose} wide>
+      {error && <p className="error">{error}</p>}
+      {!thread && !error && <p className="muted">Loading…</p>}
+      {thread && (
+        <div className="thread">
+          {thread.parents.map((post, i) =>
+            post ? (
+              <PostCard key={post.uri} item={{ kind: 'post', key: post.uri, post }} now={now} />
+            ) : (
+              <p key={i} className="post muted">
+                Post unavailable
+              </p>
+            ),
+          )}
+          <div ref={focused} className="focused">
+            <PostCard item={{ kind: 'post', key: thread.post.uri, post: thread.post }} now={now} current />
+          </div>
+          {thread.replies.map((post) => (
+            <PostCard key={post.uri} item={{ kind: 'post', key: post.uri, post }} now={now} />
+          ))}
+        </div>
+      )}
+    </Modal>
+  )
+}

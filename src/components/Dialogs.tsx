@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { RichText, type AppBskyFeedDefs } from '@atproto/api'
 import { useApp, type Session } from '../hooks'
 import { parseFeedRef, type ColumnConfig } from '../lib/columns'
@@ -11,16 +11,37 @@ function errorText(e: unknown): string {
   return e instanceof Error && e.message ? e.message : 'Something went wrong.'
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose?: () => void; children: ReactNode }) {
+const openModals: object[] = []
+
+export function Modal({
+  title,
+  onClose,
+  wide,
+  children,
+}: {
+  title: string
+  onClose?: () => void
+  wide?: boolean
+  children: ReactNode
+}) {
+  // Escape closes only the topmost dialog (a reply box open over a thread, say).
+  const close = useRef(onClose)
+  close.current = onClose
   useEffect(() => {
-    if (!onClose) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const id = {}
+    openModals.push(id)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && openModals.at(-1) === id) close.current?.()
+    }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+    return () => {
+      openModals.splice(openModals.indexOf(id), 1)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [])
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div className="modal" role="dialog" aria-label={title}>
+      <div className={wide ? 'modal wide' : 'modal'} role="dialog" aria-label={title}>
         <h2>{title}</h2>
         {children}
       </div>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppBskyFeedDefs } from '@atproto/api'
 import { Column } from './components/Column'
 import { AddColumn, Composer, Login } from './components/Dialogs'
+import { Thread } from './components/Thread'
 import { Ctx, useSessionStatus, type Session } from './hooks'
 import type { ColumnConfig } from './lib/columns'
 import { statusMessage } from './lib/session'
@@ -14,6 +15,7 @@ export function App({ session }: { session: Session }) {
   const [columns, setColumns] = useState<ColumnConfig[]>(() => loadColumns(localStorage))
   const [draft, setDraft] = useState<Draft | null>(null)
   const [adding, setAdding] = useState(false)
+  const [threadUri, setThreadUri] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -28,7 +30,14 @@ export function App({ session }: { session: Session }) {
     return () => window.removeEventListener('storage', onStorage)
   }, [session])
 
-  const ctx = useMemo(() => ({ session, compose: (replyTo?: AppBskyFeedDefs.PostView) => setDraft({ replyTo }) }), [session])
+  const ctx = useMemo(
+    () => ({
+      session,
+      compose: (replyTo?: AppBskyFeedDefs.PostView) => setDraft({ replyTo }),
+      openThread: setThreadUri,
+    }),
+    [session],
+  )
 
   if (status === 'loading') return <p className="splash muted">Connecting…</p>
   if (status === 'signed-out') return <Login session={session} />
@@ -110,6 +119,7 @@ export function App({ session }: { session: Session }) {
             {columns.length === 0 && <p className="splash muted">No columns. Add one with ＋.</p>}
           </div>
         </main>
+        {threadUri && <Thread uri={threadUri} onClose={() => setThreadUri(null)} />}
         {draft && <Composer replyTo={draft.replyTo} onClose={() => setDraft(null)} />}
         {adding && <AddColumn onAdd={(c) => setColumns((cols) => [...cols, c])} onClose={() => setAdding(false)} />}
         {status === 'expired' && <Login session={session} expired />}
