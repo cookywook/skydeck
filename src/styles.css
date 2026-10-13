@@ -293,6 +293,10 @@ main {
   max-height: 220px;
 }
 
+.images.n1 img {
+  max-height: 260px;
+}
+
 .images.n2 img,
 .images.n3 img,
 .images.n4 img {
@@ -419,9 +423,13 @@ main {
 }
 
 .notif-icon {
-  color: var(--like);
+  color: var(--repost);
   width: 20px;
   text-align: center;
+}
+
+.notif-icon.like {
+  color: var(--like);
 }
 
 .backdrop {

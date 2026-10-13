@@ -73,7 +73,18 @@ function Media({ embed, href }: { embed: unknown; href: string }) {
       <div className={`images n${Math.min(images.images.length, 4)}`}>
         {images.images.map((img) => (
           <a key={img.thumb} href={img.fullsize} target="_blank" rel="noreferrer noopener">
-            <img src={img.thumb} alt={img.alt} title={img.alt || undefined} loading="lazy" />
+            <img
+              src={img.thumb}
+              alt={img.alt}
+              title={img.alt || undefined}
+              loading="lazy"
+              // A lone image keeps its own shape (up to the height cap) so text in it is not cropped.
+              style={
+                images.images.length === 1 && img.aspectRatio
+                  ? { aspectRatio: `${img.aspectRatio.width} / ${img.aspectRatio.height}` }
+                  : undefined
+              }
+            />
           </a>
         ))}
       </div>
@@ -275,7 +286,9 @@ export function NotifCard({ item, now }: { item: Extract<Item, { kind: 'notif' }
   return (
     <article className="post notif">
       <div className="byline">
-        <span className="notif-icon">{item.reason.includes('like') ? '♥' : item.reason.includes('repost') ? '⟳' : '＋'}</span>
+        <span className={`notif-icon ${item.reason.includes('like') ? 'like' : ''}`}>
+          {item.reason.includes('like') ? '♥' : item.reason.includes('repost') ? '⇄' : '＋'}
+        </span>
         {item.authors.slice(0, 5).map((a) => (
           <Avatar key={a.did} author={a} small />
         ))}
