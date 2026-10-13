@@ -10,7 +10,7 @@
   --repost: #3fcf8e;
   --error: #ff8a7a;
   color-scheme: dark;
-  font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 * {
@@ -137,7 +137,11 @@ main {
 }
 
 .column {
-  flex: 0 0 340px;
+  /* Columns share the window so they all fit; they scroll sideways only once
+     there are too many to stay readable. */
+  flex: 1 1 0;
+  min-width: 250px;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -146,7 +150,7 @@ main {
 }
 
 .column header {
-  padding: 10px 12px 8px;
+  padding: 8px 10px 6px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -159,7 +163,8 @@ main {
 
 .column h2 {
   margin: 0;
-  font-size: 15px;
+  min-width: 0;
+  font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -183,10 +188,10 @@ main {
 .scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 6px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .empty {
@@ -202,10 +207,11 @@ main {
 .post {
   background: var(--card);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -245,8 +251,8 @@ main {
 
 .avatar {
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--line);
   object-fit: cover;
@@ -280,14 +286,17 @@ main {
   object-fit: cover;
 }
 
+/* Media is cropped to a fixed shape so a tall image cannot fill a column;
+   the full picture is one click away. */
 .images img {
-  max-height: 320px;
+  aspect-ratio: 16 / 10;
+  max-height: 220px;
 }
 
 .images.n2 img,
 .images.n3 img,
 .images.n4 img {
-  aspect-ratio: 1;
+  aspect-ratio: 4 / 3;
 }
 
 .video {
@@ -296,6 +305,12 @@ main {
   min-height: 80px;
   background: #000;
   border-radius: 8px;
+  overflow: hidden;
+}
+
+.video img {
+  aspect-ratio: 16 / 9;
+  max-height: 220px;
 }
 
 .video .play {
@@ -323,15 +338,16 @@ main {
 
 .card img {
   border-radius: 0;
-  max-height: 180px;
+  aspect-ratio: 1.91 / 1;
+  max-height: 150px;
 }
 
 .card-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 10px;
-  font-size: 13px;
+  padding: 6px 8px;
+  font-size: 12px;
 }
 
 .card-desc {
@@ -345,24 +361,49 @@ main {
 .quote {
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 13px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.quote .images img,
+.quote .video img,
+.quote .card img {
+  max-height: 130px;
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin: 0 -8px -4px;
+  gap: 2px;
+  margin: 0 -6px -4px;
   color: var(--muted);
 }
 
 .actions button {
-  min-width: 52px;
-  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 50px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.actions svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.actions .on.like svg {
+  fill: currentColor;
 }
 
 .actions .on.like {

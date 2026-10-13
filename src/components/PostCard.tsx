@@ -208,13 +208,22 @@ function Actions({ post }: { post: PostView }) {
   return (
     <div className="actions">
       <button type="button" title="Reply" onClick={() => compose(post)}>
-        ↩ {post.replyCount || ''}
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.4L3 20l1.3-5.2A8.4 8.4 0 1 1 21 11.5z" />
+        </svg>
+        {post.replyCount || ''}
       </button>
       <button type="button" title="Repost" className={repost.active ? 'on repost' : ''} onClick={repost.toggle}>
-        ⟳ {repost.count || ''}
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3" />
+        </svg>
+        {repost.count || ''}
       </button>
       <button type="button" title="Like" className={like.active ? 'on like' : ''} onClick={like.toggle}>
-        {like.active ? '♥' : '♡'} {like.count || ''}
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z" />
+        </svg>
+        {like.count || ''}
       </button>
       {(like.failed || repost.failed) && <span className="error">Failed, try again</span>}
     </div>

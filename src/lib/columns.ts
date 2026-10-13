@@ -37,7 +37,7 @@ const MAX_ITEMS = 300
 
 /** How often each kind of column polls. */
 export function pollInterval(c: ColumnConfig): number {
-  return c.kind === 'home' ? 15_000 : c.kind === 'notifications' ? 30_000 : 60_000
+  return c.kind === 'home' || c.kind === 'notifications' ? 15_000 : c.kind === 'search' ? 30_000 : 60_000
 }
 
 export async function fetchColumn(agent: AtpAgent, c: ColumnConfig, cursor?: string): Promise<Page> {
