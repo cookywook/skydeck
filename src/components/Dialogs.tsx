@@ -13,17 +13,7 @@ function errorText(e: unknown): string {
 
 const openModals: object[] = []
 
-export function Modal({
-  title,
-  onClose,
-  wide,
-  children,
-}: {
-  title: string
-  onClose?: () => void
-  wide?: boolean
-  children: ReactNode
-}) {
+function Modal({ title, onClose, children }: { title: string; onClose?: () => void; children: ReactNode }) {
   // Escape closes only the topmost dialog (a reply box open over a thread, say).
   const close = useRef(onClose)
   close.current = onClose
@@ -41,7 +31,7 @@ export function Modal({
   }, [])
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div className={wide ? 'modal wide' : 'modal'} role="dialog" aria-label={title}>
+      <div className="modal" role="dialog" aria-label={title}>
         <h2>{title}</h2>
         {children}
       </div>

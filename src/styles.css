@@ -185,10 +185,26 @@ main {
   margin-top: 2px;
 }
 
+/* Thin scrollbars that take their own space instead of floating over the posts. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.body-area {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
 .scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 6px;
+  scrollbar-gutter: stable;
+  padding: 6px 0 6px 6px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -229,9 +245,20 @@ main {
 }
 
 .thread {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  background: var(--panel);
+  border-radius: 0 0 12px 12px;
+}
+
+.thread-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
 }
 
 .context {
@@ -471,11 +498,6 @@ main {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.modal.wide {
-  width: min(560px, 100%);
-  height: 100%;
 }
 
 .modal h2 {

@@ -1,6 +1,8 @@
-import { useApp, useColumn, useNow } from '../hooks'
+import { useMemo, useState } from 'react'
+import { Ctx, useApp, useColumn, useNow } from '../hooks'
 import type { ColumnConfig } from '../lib/columns'
 import { NotifCard, PostCard } from './PostCard'
+import { Thread } from './Thread'
 
 interface Props {
   config: ColumnConfig
@@ -14,9 +16,15 @@ function ago(ms: number): string {
 }
 
 export function Column({ config, onMove, onRemove }: Props) {
-  const { session } = useApp()
+  const app = useApp()
+  const { session } = app
   const { items, poll, loadMore, loadingMore, hasMore, refresh } = useColumn(session, config)
   const now = useNow(5_000)
+
+  // A clicked post opens its thread inside this column. The trail lets Back
+  // retrace posts opened from within a thread before returning to the column.
+  const [trail, setTrail] = useState<string[]>([])
+  const ctx = useMemo(() => ({ ...app, openThread: (uri: string) => setTrail((t) => [...t, uri]) }), [app])
 
   // The health line is the point of this app: a column that has stopped
   // updating must say so rather than quietly showing old posts.
@@ -50,21 +58,29 @@ export function Column({ config, onMove, onRemove }: Props) {
           {health}
         </div>
       </header>
-      <div className="scroll">
-        {items.map((item) =>
-          item.kind === 'post' ? (
-            <PostCard key={item.key} item={item} now={now} />
-          ) : (
-            <NotifCard key={item.key} item={item} now={now} />
-          ),
-        )}
-        {items.length === 0 && poll.lastSuccess && <p className="empty muted">Nothing here yet.</p>}
-        {hasMore && items.length > 0 && (
-          <button type="button" className="more" disabled={loadingMore} onClick={loadMore}>
-            {loadingMore ? 'Loading…' : 'Load older'}
-          </button>
-        )}
-      </div>
+      <Ctx.Provider value={ctx}>
+        <div className="body-area">
+          {/* The column's posts stay mounted underneath so its scroll position survives. */}
+          <div className="scroll">
+            {items.map((item) =>
+              item.kind === 'post' ? (
+                <PostCard key={item.key} item={item} now={now} />
+              ) : (
+                <NotifCard key={item.key} item={item} now={now} />
+              ),
+            )}
+            {items.length === 0 && poll.lastSuccess && <p className="empty muted">Nothing here yet.</p>}
+            {hasMore && items.length > 0 && (
+              <button type="button" className="more" disabled={loadingMore} onClick={loadMore}>
+                {loadingMore ? 'Loading…' : 'Load older'}
+              </button>
+            )}
+          </div>
+          {trail.length > 0 && (
+            <Thread uri={trail[trail.length - 1]} onBack={() => setTrail((t) => t.slice(0, -1))} onClose={() => setTrail([])} />
+          )}
+        </div>
+      </Ctx.Provider>
     </section>
   )
 }
