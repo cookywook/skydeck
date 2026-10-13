@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { AppBskyFeedDefs, AtpAgent } from '@atproto/api'
-import { appendItems, fetchColumn, mergeItems, pollInterval, type ColumnConfig, type Item } from './lib/columns'
+import { Arrivals, appendItems, fetchColumn, mergeItems, pollInterval, type ColumnConfig, type Item } from './lib/columns'
+import { playChime } from './lib/chime'
 import { Poller, watchWake, type PollState } from './lib/poller'
 import type { SessionManager, SessionStatus } from './lib/session'
 
@@ -41,6 +42,7 @@ export function useColumn(session: Session, config: ColumnConfig) {
   const [items, setItems] = useState<Item[]>([])
   const [poll, setPoll] = useState<PollState>({ loading: true })
   const [loadingMore, setLoadingMore] = useState(false)
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set())
   const cursor = useRef<string | undefined>(undefined)
   const poller = useRef<Poller | null>(null)
   const source = JSON.stringify(config)
@@ -48,12 +50,20 @@ export function useColumn(session: Session, config: ColumnConfig) {
   useEffect(() => {
     let live = true
     setItems([])
+    setFresh(new Set())
     cursor.current = undefined
+    // Only notifications announce arrivals; a busy timeline would never stop.
+    const arrivals = config.kind === 'notifications' ? new Arrivals() : null
     const p = new Poller(async () => {
       await session.ensure()
       const page = await fetchColumn(session.agent, config)
       session.noteSuccess()
       if (!live) return
+      const added = arrivals?.note(page.items) ?? []
+      if (added.length) {
+        setFresh((old) => new Set([...old, ...added]))
+        playChime()
+      }
       setItems((old) => mergeItems(page.items, old))
       cursor.current ??= page.cursor
     }, pollInterval(config))
@@ -90,6 +100,7 @@ export function useColumn(session: Session, config: ColumnConfig) {
 
   return {
     items,
+    fresh,
     poll,
     loadingMore,
     hasMore: !!cursor.current,

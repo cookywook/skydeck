@@ -110,6 +110,10 @@ button.primary:hover:not(:disabled) {
   padding: 0;
 }
 
+.sidebar .dim {
+  opacity: 0.5;
+}
+
 .sidebar .spacer {
   flex: 1;
 }
@@ -237,6 +241,22 @@ main {
 
 .post.clickable:hover {
   background: #272d37;
+}
+
+/* A notification that arrived while the app was open glows, then settles. */
+.post.fresh {
+  animation: fresh 8s ease-out;
+}
+
+[data-hidden] .post.fresh {
+  animation-play-state: paused;
+}
+
+@keyframes fresh {
+  0%,
+  25% {
+    background: #2c4a6e;
+  }
 }
 
 .post.current {

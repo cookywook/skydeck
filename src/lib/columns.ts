@@ -143,6 +143,44 @@ export function groupNotifications(notifs: Notification[], posts: Map<string, Po
   return items
 }
 
+/** When an item happened: a notification's time, or a post's. */
+export function itemTime(item: Item): string {
+  return item.kind === 'notif' ? item.indexedAt : item.post.indexedAt
+}
+
+/** Identifies one state of an item: a like group gets a new id when someone else joins it. */
+export function itemId(item: Item): string {
+  return `${item.key}@${itemTime(item)}`
+}
+
+/**
+ * Tracks which items have arrived since the column was first loaded. The
+ * first page only sets the baseline. After that an item counts as new when it
+ * has not been seen and is more recent than everything seen before, so an old
+ * item sliding back into the page is not announced.
+ */
+export class Arrivals {
+  private seen = new Set<string>()
+  private newest = ''
+  private primed = false
+
+  /** Records a freshly polled page and returns the ids that are new in it. */
+  note(items: Item[]): string[] {
+    const fresh: string[] = []
+    let newest = this.newest
+    for (const item of items) {
+      const id = itemId(item)
+      const time = itemTime(item)
+      if (this.primed && !this.seen.has(id) && time > this.newest) fresh.push(id)
+      this.seen.add(id)
+      if (time > newest) newest = time
+    }
+    this.newest = newest
+    this.primed = true
+    return fresh
+  }
+}
+
 /** Newly fetched items go on top; older ones we already had stay below, without duplicates. */
 export function mergeItems(fresh: Item[], old: Item[], cap = MAX_ITEMS): Item[] {
   const seen = new Set<string>()

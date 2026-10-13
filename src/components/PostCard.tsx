@@ -256,15 +256,17 @@ interface PostCardProps {
   now: number
   /** The post a thread view is centred on: highlighted, and not clickable. */
   current?: boolean
+  /** Arrived while the app was open: briefly highlighted. */
+  fresh?: boolean
 }
 
-export function PostCard({ item, now, current }: PostCardProps) {
+export function PostCard({ item, now, current, fresh }: PostCardProps) {
   const { post } = item
   const record = post.record as PostRecord
   const href = postUrl(post)
   const open = useOpenThread(current ? undefined : post.uri)
   return (
-    <article className={current ? 'post current' : 'post clickable'} onClick={open}>
+    <article className={`post ${current ? 'current' : 'clickable'}${fresh ? ' fresh' : ''}`} onClick={open}>
       {item.repostBy && <div className="context">⟳ Reposted by {displayName(item.repostBy)}</div>}
       {item.label && (
         <div className="context">
@@ -298,12 +300,12 @@ const NOTIF_TEXT: Record<string, string> = {
   'repost-via-repost': 'reposted your repost',
 }
 
-export function NotifCard({ item, now }: { item: Extract<Item, { kind: 'notif' }>; now: number }) {
+export function NotifCard({ item, now, fresh }: { item: Extract<Item, { kind: 'notif' }>; now: number; fresh?: boolean }) {
   const [first, ...rest] = item.authors
   const subject = item.subject?.record as PostRecord | undefined
   const open = useOpenThread(item.subject?.uri)
   return (
-    <article className={item.subject ? 'post notif clickable' : 'post notif'} onClick={open}>
+    <article className={`post notif${item.subject ? ' clickable' : ''}${fresh ? ' fresh' : ''}`} onClick={open}>
       <div className="byline">
         <span className={`notif-icon ${item.reason.includes('like') ? 'like' : ''}`}>
           {item.reason.includes('like') ? '♥' : item.reason.includes('repost') ? '⇄' : '＋'}

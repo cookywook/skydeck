@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AtpAgent } from '@atproto/api'
 import { App } from './App'
+import { armChime } from './lib/chime'
 import { SessionManager, SessionStore } from './lib/session'
 import './styles.css'
 
@@ -14,6 +15,12 @@ const session = new SessionManager(
   (persistSession) => new AtpAgent({ service: SERVICE, persistSession }),
 )
 void session.start()
+armChime()
+
+// Lets the stylesheet hold a new notification's highlight until the window is actually in view.
+const markHidden = () => document.documentElement.toggleAttribute('data-hidden', document.visibilityState !== 'visible')
+document.addEventListener('visibilitychange', markHidden)
+markHidden()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

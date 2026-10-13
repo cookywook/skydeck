@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AppBskyFeedDefs, AppBskyNotificationListNotifications } from '@atproto/api'
 import {
+  Arrivals,
   appendItems,
   groupNotifications,
   mergeItems,
@@ -215,5 +216,40 @@ describe('flattenThread', () => {
 
   it('returns null when the post itself is unavailable', () => {
     expect(flattenThread({ $type: 'app.bsky.feed.defs#notFoundPost', uri: 'a', notFound: true })).toBeNull()
+  })
+})
+
+describe('Arrivals', () => {
+  const like = (subject: string, at: string, ...who: string[]): Item => ({
+    kind: 'notif',
+    key: `n:like:${subject}`,
+    reason: 'like',
+    authors: who.map((w) => ({ did: `did:plc:${w}`, handle: `${w}.test` })),
+    indexedAt: at,
+  })
+
+  it('announces nothing on the first page', () => {
+    expect(new Arrivals().note([like('a', '2026-10-13T12:00:00Z', 'x')])).toEqual([])
+  })
+
+  it('announces items that arrive later, once', () => {
+    const a = new Arrivals()
+    const old = like('a', '2026-10-13T12:00:00Z', 'x')
+    a.note([old])
+    const added = like('b', '2026-10-13T12:05:00Z', 'y')
+    expect(a.note([added, old])).toEqual(['n:like:b@2026-10-13T12:05:00Z'])
+    expect(a.note([added, old])).toEqual([])
+  })
+
+  it('announces a like group again when someone new joins it', () => {
+    const a = new Arrivals()
+    a.note([like('a', '2026-10-13T12:00:00Z', 'x')])
+    expect(a.note([like('a', '2026-10-13T12:09:00Z', 'y', 'x')])).toEqual(['n:like:a@2026-10-13T12:09:00Z'])
+  })
+
+  it('ignores an older item that slides into the page', () => {
+    const a = new Arrivals()
+    a.note([like('b', '2026-10-13T12:05:00Z', 'y')])
+    expect(a.note([like('a', '2026-10-13T11:00:00Z', 'x')])).toEqual([])
   })
 })

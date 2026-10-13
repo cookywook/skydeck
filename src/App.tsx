@@ -4,6 +4,7 @@ import { Column } from './components/Column'
 import { AddColumn, Composer, Login } from './components/Dialogs'
 import { Ctx, useSessionStatus, type Session } from './hooks'
 import type { ColumnConfig } from './lib/columns'
+import { isMuted, setMuted } from './lib/chime'
 import { statusMessage } from './lib/session'
 import { exportColumns, loadColumns, parseColumns, saveColumns } from './lib/settings'
 
@@ -15,6 +16,7 @@ export function App({ session }: { session: Session }) {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [adding, setAdding] = useState(false)
   const [notice, setNotice] = useState('')
+  const [muted, setMutedState] = useState(isMuted)
   const fileInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => saveColumns(localStorage, columns), [columns])
@@ -78,6 +80,18 @@ export function App({ session }: { session: Session }) {
           </button>
           <button type="button" title="Add column" onClick={() => setAdding(true)}>
             ＋
+          </button>
+          <button
+            type="button"
+            title={muted ? 'Notification sound is off' : 'Notification sound is on'}
+            aria-pressed={!muted}
+            className={muted ? 'dim' : ''}
+            onClick={() => {
+              setMuted(!muted)
+              setMutedState(!muted)
+            }}
+          >
+            {muted ? '🔕' : '🔔'}
           </button>
           <span className="spacer" />
           <button type="button" title="Export columns to a file" onClick={download}>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Ctx, useApp, useColumn, useNow } from '../hooks'
-import type { ColumnConfig } from '../lib/columns'
+import { itemId, type ColumnConfig } from '../lib/columns'
 import { NotifCard, PostCard } from './PostCard'
 import { Thread } from './Thread'
 
@@ -18,7 +18,7 @@ function ago(ms: number): string {
 export function Column({ config, onMove, onRemove }: Props) {
   const app = useApp()
   const { session } = app
-  const { items, poll, loadMore, loadingMore, hasMore, refresh } = useColumn(session, config)
+  const { items, fresh, poll, loadMore, loadingMore, hasMore, refresh } = useColumn(session, config)
   const now = useNow(5_000)
 
   // A clicked post opens its thread inside this column. The trail lets Back
@@ -62,11 +62,12 @@ export function Column({ config, onMove, onRemove }: Props) {
         <div className="body-area">
           {/* The column's posts stay mounted underneath so its scroll position survives. */}
           <div className="scroll">
+            {/* Keyed by state, so a like group that gains someone is highlighted afresh. */}
             {items.map((item) =>
               item.kind === 'post' ? (
-                <PostCard key={item.key} item={item} now={now} />
+                <PostCard key={itemId(item)} item={item} now={now} fresh={fresh.has(itemId(item))} />
               ) : (
-                <NotifCard key={item.key} item={item} now={now} />
+                <NotifCard key={itemId(item)} item={item} now={now} fresh={fresh.has(itemId(item))} />
               ),
             )}
             {items.length === 0 && poll.lastSuccess && <p className="empty muted">Nothing here yet.</p>}
