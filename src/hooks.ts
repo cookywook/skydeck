@@ -4,6 +4,7 @@ import { Arrivals, appendItems, fetchColumn, mergeItems, pollInterval, type Colu
 import { playChime } from './lib/chime'
 import { Poller, watchWake, type PollState } from './lib/poller'
 import type { SessionManager, SessionStatus } from './lib/session'
+import type { MediaView } from './components/Lightbox'
 
 export type Session = SessionManager<AtpAgent>
 
@@ -11,6 +12,7 @@ export interface AppContext {
   session: Session
   compose(replyTo?: AppBskyFeedDefs.PostView): void
   openThread(uri: string): void
+  viewMedia(media: MediaView): void
 }
 
 export const Ctx = createContext<AppContext | null>(null)

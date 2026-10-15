@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppBskyFeedDefs } from '@atproto/api'
 import { Column } from './components/Column'
 import { AddColumn, Composer, Login } from './components/Dialogs'
+import { Lightbox, type MediaView } from './components/Lightbox'
 import { Ctx, useSessionStatus, type Session } from './hooks'
 import type { ColumnConfig } from './lib/columns'
 import { isMuted, setMuted } from './lib/chime'
@@ -17,6 +18,7 @@ export function App({ session }: { session: Session }) {
   const [adding, setAdding] = useState(false)
   const [notice, setNotice] = useState('')
   const [muted, setMutedState] = useState(isMuted)
+  const [media, setMedia] = useState<MediaView | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => saveColumns(localStorage, columns), [columns])
@@ -36,6 +38,7 @@ export function App({ session }: { session: Session }) {
       compose: (replyTo?: AppBskyFeedDefs.PostView) => setDraft({ replyTo }),
       // Each column supplies its own; outside a column there is nowhere to show a thread.
       openThread: () => {},
+      viewMedia: setMedia,
     }),
     [session],
   )
@@ -132,6 +135,7 @@ export function App({ session }: { session: Session }) {
             {columns.length === 0 && <p className="splash muted">No columns. Add one with ＋.</p>}
           </div>
         </main>
+        {media && <Lightbox media={media} onClose={() => setMedia(null)} />}
         {draft && <Composer replyTo={draft.replyTo} onClose={() => setDraft(null)} />}
         {adding && <AddColumn onAdd={(c) => setColumns((cols) => [...cols, c])} onClose={() => setAdding(false)} />}
         {status === 'expired' && <Login session={session} expired />}

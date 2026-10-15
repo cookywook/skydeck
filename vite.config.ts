@@ -8,7 +8,8 @@ const CSP = [
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "img-src https: data:",
-  "media-src https:",
+  // hls.js plays video through MediaSource, which uses blob: URLs.
+  "media-src https: blob:",
   "connect-src https:",
   "base-uri 'none'",
   "form-action 'none'",

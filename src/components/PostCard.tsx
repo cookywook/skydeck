@@ -66,13 +66,29 @@ const asRecordWithMedia = (e: unknown) =>
 const asViewRecord = (e: unknown) =>
   AppBskyEmbedRecord.isViewRecord(e) ? (e as AppBskyEmbedRecord.ViewRecord) : undefined
 
+/** A plain click previews in the app; ⌘/Ctrl/Shift-click or middle-click still opens the link in a browser. */
+function previewClick(open: () => void) {
+  return (e: MouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+    e.preventDefault()
+    open()
+  }
+}
+
 function Media({ embed, href }: { embed: unknown; href: string }) {
+  const { viewMedia } = useApp()
   const images = asImages(embed)
   if (images) {
     return (
       <div className={`images n${Math.min(images.images.length, 4)}`}>
-        {images.images.map((img) => (
-          <a key={img.thumb} href={img.fullsize} target="_blank" rel="noreferrer noopener">
+        {images.images.map((img, index) => (
+          <a
+            key={img.thumb}
+            href={img.fullsize}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={previewClick(() => viewMedia({ kind: 'images', images: images.images, index }))}
+          >
             <img
               src={img.thumb}
               alt={img.alt}
@@ -93,7 +109,22 @@ function Media({ embed, href }: { embed: unknown; href: string }) {
   const video = asVideo(embed)
   if (video) {
     return (
-      <a className="video" href={href} target="_blank" rel="noreferrer noopener" title="Play on bsky.app">
+      <a
+        className="video"
+        href={href}
+        target="_blank"
+        rel="noreferrer noopener"
+        title="Play"
+        onClick={previewClick(() =>
+          viewMedia({
+            kind: 'video',
+            playlist: video.playlist,
+            thumbnail: video.thumbnail,
+            alt: video.alt,
+            gif: video.presentation === 'gif',
+          }),
+        )}
+      >
         {video.thumbnail && <img src={video.thumbnail} alt={video.alt ?? ''} loading="lazy" />}
         <span className="play">▶</span>
       </a>

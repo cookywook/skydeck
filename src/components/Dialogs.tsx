@@ -13,8 +13,8 @@ function errorText(e: unknown): string {
 
 const openModals: object[] = []
 
-function Modal({ title, onClose, children }: { title: string; onClose?: () => void; children: ReactNode }) {
-  // Escape closes only the topmost dialog (a reply box open over a thread, say).
+/** Escape calls `onClose` only for the topmost open dialog or preview. */
+export function useEscape(onClose?: () => void) {
   const close = useRef(onClose)
   close.current = onClose
   useEffect(() => {
@@ -29,6 +29,10 @@ function Modal({ title, onClose, children }: { title: string; onClose?: () => vo
       window.removeEventListener('keydown', onKey)
     }
   }, [])
+}
+
+function Modal({ title, onClose, children }: { title: string; onClose?: () => void; children: ReactNode }) {
+  useEscape(onClose)
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <div className="modal" role="dialog" aria-label={title}>

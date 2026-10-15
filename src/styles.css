@@ -498,6 +498,76 @@ main {
   color: var(--like);
 }
 
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgb(5 7 10 / 92%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 16px 24px;
+}
+
+.lightbox figure {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.lightbox img,
+.lightbox video {
+  display: block;
+  max-width: min(1400px, 100%);
+  max-height: calc(100vh - 140px);
+  min-width: 0;
+  border-radius: 6px;
+  object-fit: contain;
+  background: center / contain no-repeat;
+}
+
+.lightbox .video-figure {
+  width: min(1000px, 100%);
+}
+
+.lightbox video {
+  width: 100%;
+  background: #000;
+}
+
+.lightbox figcaption {
+  max-width: 720px;
+  max-height: 60px;
+  overflow-y: auto;
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--text);
+}
+
+.lightbox-nav {
+  flex: none;
+  width: 44px;
+  height: 64px;
+  font-size: 32px;
+  color: var(--text);
+}
+
 .backdrop {
   position: fixed;
   inset: 0;
