@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import {
   AppBskyEmbedExternal,
   AppBskyEmbedImages,
@@ -10,6 +10,7 @@ import {
   type AppBskyRichtextFacet,
 } from '@atproto/api'
 import { useApp } from '../hooks'
+import { useEscape } from './Dialogs'
 import { postUrl, relativeTime, type Author, type Item } from '../lib/columns'
 
 type PostView = AppBskyFeedDefs.PostView
@@ -232,8 +233,49 @@ function useToggle(
   return { active: !!uri, count, toggle, failed }
 }
 
+/**
+ * The repost button's choices. Closes on Escape or a click anywhere else; a
+ * click on the button itself is left to the button, which toggles the menu.
+ */
+function RepostMenu({ trigger, reposted, onRepost, onQuote, onClose }: {
+  trigger: RefObject<HTMLButtonElement | null>
+  reposted: boolean
+  onRepost(): void
+  onQuote(): void
+  onClose(): void
+}) {
+  useEscape(onClose)
+  const ref = useRef<HTMLDivElement>(null)
+  const close = useRef(onClose)
+  close.current = onClose
+  useEffect(() => {
+    const away = (e: PointerEvent) => {
+      const target = e.target as Node
+      if (!ref.current?.contains(target) && !trigger.current?.contains(target)) close.current()
+    }
+    document.addEventListener('pointerdown', away)
+    return () => document.removeEventListener('pointerdown', away)
+  }, [trigger])
+  const pick = (fn: () => void) => () => {
+    onClose()
+    fn()
+  }
+  return (
+    <div className="menu" role="menu" ref={ref}>
+      <button type="button" role="menuitem" onClick={pick(onRepost)}>
+        {reposted ? 'Undo repost' : 'Repost'}
+      </button>
+      <button type="button" role="menuitem" onClick={pick(onQuote)}>
+        Quote post
+      </button>
+    </div>
+  )
+}
+
 function Actions({ post }: { post: PostView }) {
-  const { session, compose } = useApp()
+  const { session, compose, quote } = useApp()
+  const [menu, setMenu] = useState(false)
+  const repostButton = useRef<HTMLButtonElement>(null)
   const agent = session.agent
   const like = useToggle(
     post.viewer?.like,
@@ -255,7 +297,15 @@ function Actions({ post }: { post: PostView }) {
         </svg>
         {post.replyCount || ''}
       </button>
-      <button type="button" title="Repost" className={repost.active ? 'on repost' : ''} onClick={repost.toggle}>
+      <button
+        ref={repostButton}
+        type="button"
+        title="Repost or quote"
+        aria-haspopup="menu"
+        aria-expanded={menu}
+        className={repost.active ? 'on repost' : ''}
+        onClick={() => setMenu((m) => !m)}
+      >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3" />
         </svg>
@@ -267,6 +317,15 @@ function Actions({ post }: { post: PostView }) {
         </svg>
         {like.count || ''}
       </button>
+      {menu && (
+        <RepostMenu
+          trigger={repostButton}
+          reposted={repost.active}
+          onRepost={repost.toggle}
+          onQuote={() => quote(post)}
+          onClose={() => setMenu(false)}
+        />
+      )}
       {(like.failed || repost.failed) && <span className="error">Failed, try again</span>}
     </div>
   )

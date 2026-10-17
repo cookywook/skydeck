@@ -113,13 +113,34 @@ export function Login({ session, expired }: { session: Session; expired?: boolea
   )
 }
 
-export function Composer({ replyTo, onClose }: { replyTo?: AppBskyFeedDefs.PostView; onClose(): void }) {
+interface ComposerProps {
+  replyTo?: AppBskyFeedDefs.PostView
+  /** A post to quote: it is embedded below the new post's text. */
+  quote?: AppBskyFeedDefs.PostView
+  onClose(): void
+}
+
+function PostPreview({ post }: { post: AppBskyFeedDefs.PostView }) {
+  return (
+    <div className="quote">
+      <div className="byline">
+        <Avatar author={post.author} small />
+        <strong>{displayName(post.author)}</strong>
+        <span className="muted">@{post.author.handle}</span>
+      </div>
+      <div className="body muted">{(post.record as { text?: string }).text}</div>
+    </div>
+  )
+}
+
+export function Composer({ replyTo, quote, onClose }: ComposerProps) {
   const { session } = useApp()
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const left = MAX_GRAPHEMES - new RichText({ text }).graphemeLength
-  const canSend = !busy && text.trim().length > 0 && left >= 0
+  // A quote can go out with no text of its own, as in the Bluesky app.
+  const canSend = !busy && (text.trim().length > 0 || !!quote) && left >= 0
 
   const send = async () => {
     if (!canSend) return
@@ -135,6 +156,7 @@ export function Composer({ replyTo, onClose }: { replyTo?: AppBskyFeedDefs.PostV
         text: rt.text,
         facets: rt.facets,
         reply: parent && { root: root ?? parent, parent },
+        embed: quote && { $type: 'app.bsky.embed.record', record: { uri: quote.uri, cid: quote.cid } },
         langs: [navigator.language.split('-')[0]],
       })
       onClose()
@@ -145,24 +167,17 @@ export function Composer({ replyTo, onClose }: { replyTo?: AppBskyFeedDefs.PostV
   }
 
   return (
-    <Modal title={replyTo ? 'Reply' : 'New post'} onClose={busy ? undefined : onClose}>
-      {replyTo && (
-        <div className="quote">
-          <div className="byline">
-            <Avatar author={replyTo.author} small />
-            <strong>{displayName(replyTo.author)}</strong>
-          </div>
-          <div className="body muted">{(replyTo.record as { text?: string }).text}</div>
-        </div>
-      )}
+    <Modal title={replyTo ? 'Reply' : quote ? 'Quote post' : 'New post'} onClose={busy ? undefined : onClose}>
+      {replyTo && <PostPreview post={replyTo} />}
       <textarea
         autoFocus
         rows={6}
         value={text}
-        placeholder={replyTo ? 'Write your reply' : "What's up?"}
+        placeholder={replyTo ? 'Write your reply' : quote ? 'Add a comment' : "What's up?"}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => (e.metaKey || e.ctrlKey) && e.key === 'Enter' && send()}
       />
+      {quote && <PostPreview post={quote} />}
       {error && <p className="error">{error}</p>}
       <div className="buttons">
         <span className={left < 0 ? 'error' : 'muted'}>{left}</span>

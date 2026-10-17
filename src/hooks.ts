@@ -11,6 +11,7 @@ export type Session = SessionManager<AtpAgent>
 export interface AppContext {
   session: Session
   compose(replyTo?: AppBskyFeedDefs.PostView): void
+  quote(post: AppBskyFeedDefs.PostView): void
   openThread(uri: string): void
   viewMedia(media: MediaView): void
 }

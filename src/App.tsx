@@ -9,7 +9,7 @@ import { isMuted, setMuted } from './lib/chime'
 import { statusMessage } from './lib/session'
 import { exportColumns, loadColumns, parseColumns, saveColumns } from './lib/settings'
 
-type Draft = { replyTo?: AppBskyFeedDefs.PostView }
+type Draft = { replyTo?: AppBskyFeedDefs.PostView; quote?: AppBskyFeedDefs.PostView }
 
 export function App({ session }: { session: Session }) {
   const status = useSessionStatus(session)
@@ -36,6 +36,7 @@ export function App({ session }: { session: Session }) {
     () => ({
       session,
       compose: (replyTo?: AppBskyFeedDefs.PostView) => setDraft({ replyTo }),
+      quote: (quote: AppBskyFeedDefs.PostView) => setDraft({ quote }),
       // Each column supplies its own; outside a column there is nowhere to show a thread.
       openThread: () => {},
       viewMedia: setMedia,
@@ -136,7 +137,7 @@ export function App({ session }: { session: Session }) {
           </div>
         </main>
         {media && <Lightbox media={media} onClose={() => setMedia(null)} />}
-        {draft && <Composer replyTo={draft.replyTo} onClose={() => setDraft(null)} />}
+        {draft && <Composer replyTo={draft.replyTo} quote={draft.quote} onClose={() => setDraft(null)} />}
         {adding && <AddColumn onAdd={(c) => setColumns((cols) => [...cols, c])} onClose={() => setAdding(false)} />}
         {status === 'expired' && <Login session={session} expired />}
       </div>
