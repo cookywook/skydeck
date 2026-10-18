@@ -24,6 +24,15 @@ body,
   margin: 0;
 }
 
+/* No macOS rubber-band bounce: past the top or bottom of a column (or the
+   window) it pulled the content away and showed an empty band. */
+html,
+body,
+.columns,
+.scroll {
+  overscroll-behavior: none;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
