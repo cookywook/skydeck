@@ -357,6 +357,38 @@ button.who.inline {
   padding-left: 8px;
 }
 
+.profile-actions,
+.follow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.follow button {
+  padding: 4px 14px;
+  border-radius: 999px;
+}
+
+/* "Following" reads as a state; hovering shows that clicking will undo it. */
+.follow button.following {
+  border-color: var(--line);
+}
+
+.follow button.following:hover:not(:disabled) {
+  border-color: var(--error);
+  color: var(--error);
+  background: none;
+}
+
+.follow .undo,
+.follow button.following:hover:not(:disabled) .state {
+  display: none;
+}
+
+.follow button.following:hover:not(:disabled) .undo {
+  display: inline;
+}
+
 .avatar.large {
   width: 64px;
   height: 64px;

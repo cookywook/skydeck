@@ -10,6 +10,57 @@ function errorText(e: unknown, fallback: string) {
   return e instanceof Error && e.message ? e.message : fallback
 }
 
+type Detailed = AppBskyActorDefs.ProfileViewDetailed
+
+/** Follow or unfollow, updating the button and follower count at once and undoing that if the request fails. */
+function FollowButton({ profile, onChange }: { profile: Detailed; onChange(p: Detailed): void }) {
+  const { session } = useApp()
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const following = profile.viewer?.following
+
+  const toggle = async () => {
+    if (busy) return
+    setBusy(true)
+    setFailed(false)
+    const before = profile
+    const count = profile.followersCount ?? 0
+    const set = (uri: string | undefined, followersCount: number) =>
+      onChange({ ...profile, followersCount, viewer: { ...profile.viewer, following: uri } })
+    try {
+      if (following) {
+        set(undefined, Math.max(0, count - 1))
+        await session.agent.deleteFollow(following)
+      } else {
+        set('pending', count + 1)
+        const { uri } = await session.agent.follow(profile.did)
+        set(uri, count + 1)
+      }
+    } catch {
+      onChange(before)
+      setFailed(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <span className="follow">
+      {failed && <span className="error small">Failed, try again</span>}
+      <button type="button" className={following ? 'following' : 'primary'} disabled={busy} onClick={toggle}>
+        {following ? (
+          <>
+            <span className="state">Following</span>
+            <span className="undo">Unfollow</span>
+          </>
+        ) : (
+          'Follow'
+        )}
+      </button>
+    </span>
+  )
+}
+
 /** Someone's profile card and their recent posts. */
 export function Profile({ actor }: { actor: string }) {
   const { session } = useApp()
@@ -47,20 +98,24 @@ export function Profile({ actor }: { actor: string }) {
   if (!profile) return <p className="muted empty">Loading…</p>
 
   const viewer = profile.viewer
+  const canFollow = profile.did !== session.did && !viewer?.blocking && !viewer?.blockedBy
   return (
     <>
       <section className="profile">
         {profile.banner ? <img className="banner" src={profile.banner} alt="" /> : <div className="banner" />}
         <div className="profile-head">
           {profile.avatar ? <img className="avatar large" src={profile.avatar} alt="" /> : <span className="avatar large" />}
-          <a
-            className="muted small"
-            href={`https://bsky.app/profile/${profile.handle}`}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            Open on bsky.app
-          </a>
+          <span className="profile-actions">
+            <a
+              className="muted small"
+              href={`https://bsky.app/profile/${profile.handle}`}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              Open on bsky.app
+            </a>
+            {canFollow && <FollowButton profile={profile} onChange={setProfile} />}
+          </span>
         </div>
         <div className="profile-names">
           <strong>{displayName(profile)}</strong>
