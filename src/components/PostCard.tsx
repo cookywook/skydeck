@@ -156,13 +156,21 @@ function Media({ embed, href }: { embed: unknown; href: string }) {
 
 function Quote({ record: quoted }: { record: unknown }) {
   const record = asViewRecord(quoted)
+  const open = useOpenThread(record?.uri)
   if (!record) {
     return <div className="quote muted">Quoted post unavailable</div>
   }
   const value = record.value as PostRecord
   const href = `https://bsky.app/profile/${record.author.handle}/post/${record.uri.split('/').pop()}`
   return (
-    <div className="quote">
+    // Opens the quoted post's own thread, not the thread of the post quoting it.
+    <div
+      className="quote clickable"
+      onClick={(e) => {
+        e.stopPropagation()
+        open(e)
+      }}
+    >
       <div className="byline">
         <Avatar author={record.author} small />
         <strong>{displayName(record.author)}</strong>
