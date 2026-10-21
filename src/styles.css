@@ -274,7 +274,7 @@ main {
   outline-offset: -2px;
 }
 
-.thread {
+.panel {
   position: absolute;
   inset: 0;
   display: flex;
@@ -283,12 +283,112 @@ main {
   border-radius: 0 0 12px 12px;
 }
 
-.thread-bar {
+.panel-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 4px 6px;
   border-bottom: 1px solid var(--line);
+}
+
+/* Names and avatars are buttons (they open a profile) but look like text. */
+button.who {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  min-width: 0;
+}
+
+button.who:hover:not(:disabled) {
+  background: none;
+}
+
+button.who:hover strong,
+.context button.who:hover {
+  text-decoration: underline;
+}
+
+button.who:has(> .avatar) {
+  flex: none;
+  display: block;
+  line-height: 0;
+}
+
+button.who.names {
+  display: flex;
+}
+
+button.who.inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.profile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 4px 10px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.profile .banner {
+  display: block;
+  width: calc(100% + 8px);
+  margin: 0 -4px;
+  aspect-ratio: 3 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.profile-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: -32px;
+  padding-left: 8px;
+}
+
+.avatar.large {
+  width: 64px;
+  height: 64px;
+  border: 3px solid var(--panel);
+}
+
+.profile-names {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-names strong {
+  font-size: 16px;
+}
+
+.pill {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 11px;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.counts strong {
+  color: var(--text);
 }
 
 .context {

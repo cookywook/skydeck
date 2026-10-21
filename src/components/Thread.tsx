@@ -3,8 +3,8 @@ import { useApp, useNow } from '../hooks'
 import { flattenThread, type Thread as ThreadData } from '../lib/thread'
 import { PostCard } from './PostCard'
 
-/** A thread shown inside its column, over the column's own posts. */
-export function Thread({ uri, onBack, onClose }: { uri: string; onBack(): void; onClose(): void }) {
+/** A post with the posts it replies to above and its direct replies below. */
+export function Thread({ uri }: { uri: string }) {
   const { session } = useApp()
   const [thread, setThread] = useState<ThreadData | null>(null)
   const [error, setError] = useState('')
@@ -13,8 +13,6 @@ export function Thread({ uri, onBack, onClose }: { uri: string; onBack(): void; 
 
   useEffect(() => {
     let live = true
-    setThread(null)
-    setError('')
     session.agent
       .getPostThread({ uri, depth: 1, parentHeight: 30 })
       .then((res) => {
@@ -34,40 +32,25 @@ export function Thread({ uri, onBack, onClose }: { uri: string; onBack(): void; 
     if (thread) focused.current?.scrollIntoView({ block: thread.parents.length ? 'center' : 'start' })
   }, [thread])
 
+  if (error) return <p className="error empty">{error}</p>
+  if (!thread) return <p className="muted empty">Loading…</p>
   return (
-    <div className="thread">
-      <div className="thread-bar">
-        <button type="button" onClick={onBack}>
-          ‹ Back
-        </button>
-        <strong>Thread</strong>
-        <button type="button" title="Close thread" onClick={onClose}>
-          ×
-        </button>
+    <>
+      {thread.parents.map((post, i) =>
+        post ? (
+          <PostCard key={post.uri} item={{ kind: 'post', key: post.uri, post }} now={now} />
+        ) : (
+          <p key={i} className="post muted">
+            Post unavailable
+          </p>
+        ),
+      )}
+      <div ref={focused}>
+        <PostCard item={{ kind: 'post', key: thread.post.uri, post: thread.post }} now={now} current />
       </div>
-      <div className="scroll">
-        {error && <p className="error empty">{error}</p>}
-        {!thread && !error && <p className="muted empty">Loading…</p>}
-        {thread && (
-          <>
-            {thread.parents.map((post, i) =>
-              post ? (
-                <PostCard key={post.uri} item={{ kind: 'post', key: post.uri, post }} now={now} />
-              ) : (
-                <p key={i} className="post muted">
-                  Post unavailable
-                </p>
-              ),
-            )}
-            <div ref={focused}>
-              <PostCard item={{ kind: 'post', key: thread.post.uri, post: thread.post }} now={now} current />
-            </div>
-            {thread.replies.map((post) => (
-              <PostCard key={post.uri} item={{ kind: 'post', key: post.uri, post }} now={now} />
-            ))}
-          </>
-        )}
-      </div>
-    </div>
+      {thread.replies.map((post) => (
+        <PostCard key={post.uri} item={{ kind: 'post', key: post.uri, post }} now={now} />
+      ))}
+    </>
   )
 }

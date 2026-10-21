@@ -79,7 +79,7 @@ export function showInHome(v: AppBskyFeedDefs.FeedViewPost, myDid?: string): boo
   return AppBskyFeedDefs.isPostView(parent) && followed((parent as PostView).author) && followed(v.post.author)
 }
 
-function feedItem(v: AppBskyFeedDefs.FeedViewPost): Item {
+export function feedItem(v: AppBskyFeedDefs.FeedViewPost): Item {
   const repostBy = AppBskyFeedDefs.isReasonRepost(v.reason) ? v.reason.by : undefined
   const parent = v.reply?.parent
   const replyTo = parent && AppBskyFeedDefs.isPostView(parent) ? parent.author : undefined

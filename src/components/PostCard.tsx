@@ -29,6 +29,21 @@ export function Avatar({ author, small }: { author: Author; small?: boolean }) {
   )
 }
 
+/** A name or avatar that opens that person's profile in the column. */
+export function Who({ author, className, children }: { author: Author; className?: string; children: ReactNode }) {
+  const { openProfile } = useApp()
+  return (
+    <button
+      type="button"
+      className={className ? `who ${className}` : 'who'}
+      title={`@${author.handle}`}
+      onClick={() => openProfile(author.did)}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function displayName(author: Author): string {
   return author.displayName?.trim() || author.handle
 }
@@ -172,9 +187,11 @@ function Quote({ record: quoted }: { record: unknown }) {
       }}
     >
       <div className="byline">
-        <Avatar author={record.author} small />
-        <strong>{displayName(record.author)}</strong>
-        <span className="muted">@{record.author.handle}</span>
+        <Who author={record.author} className="inline">
+          <Avatar author={record.author} small />
+          <strong>{displayName(record.author)}</strong>
+          <span className="muted">@{record.author.handle}</span>
+        </Who>
       </div>
       {value.text && <Body text={value.text} facets={value.facets} />}
       {record.embeds?.[0] != null && <Media embed={record.embeds[0]} href={href} />}
@@ -365,23 +382,33 @@ export function PostCard({ item, now, current, fresh }: PostCardProps) {
   const open = useOpenThread(current ? undefined : post.uri)
   return (
     <article className={`post ${current ? 'current' : 'clickable'}${fresh ? ' fresh' : ''}`} onClick={open}>
-      {item.repostBy && <div className="context">⟳ Reposted by {displayName(item.repostBy)}</div>}
+      {item.repostBy && (
+        <div className="context">
+          ⟳ Reposted by <Who author={item.repostBy}>{displayName(item.repostBy)}</Who>
+        </div>
+      )}
       {item.label && (
         <div className="context">
-          {displayName(post.author)} {item.label}
+          <Who author={post.author}>{displayName(post.author)}</Who> {item.label}
         </div>
       )}
       <div className="byline">
-        <Avatar author={post.author} />
-        <span className="names">
+        <Who author={post.author}>
+          <Avatar author={post.author} />
+        </Who>
+        <Who author={post.author} className="names">
           <strong>{displayName(post.author)}</strong>
           <span className="muted">@{post.author.handle}</span>
-        </span>
+        </Who>
         <a className="time muted" href={href} target="_blank" rel="noreferrer noopener" title="Open on bsky.app">
           {relativeTime(record.createdAt ?? post.indexedAt, now)}
         </a>
       </div>
-      {item.replyTo && <div className="context">↩ Replying to {displayName(item.replyTo)}</div>}
+      {item.replyTo && (
+        <div className="context">
+          ↩ Replying to <Who author={item.replyTo}>{displayName(item.replyTo)}</Who>
+        </div>
+      )}
       {record.text && <Body text={record.text} facets={record.facets} />}
       {post.embed != null && <Embed embed={post.embed} href={href} />}
       <Actions post={post} />
@@ -409,12 +436,16 @@ export function NotifCard({ item, now, fresh }: { item: Extract<Item, { kind: 'n
           {item.reason.includes('like') ? '♥' : item.reason.includes('repost') ? '⇄' : '＋'}
         </span>
         {item.authors.slice(0, 5).map((a) => (
-          <Avatar key={a.did} author={a} small />
+          <Who key={a.did} author={a}>
+            <Avatar author={a} small />
+          </Who>
         ))}
         <span className="time muted">{relativeTime(item.indexedAt, now)}</span>
       </div>
       <div>
-        <strong>{displayName(first)}</strong>
+        <Who author={first}>
+          <strong>{displayName(first)}</strong>
+        </Who>
         {rest.length > 0 && ` and ${rest.length} other${rest.length > 1 ? 's' : ''}`}{' '}
         {NOTIF_TEXT[item.reason] ?? item.reason}
       </div>

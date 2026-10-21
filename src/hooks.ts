@@ -13,6 +13,8 @@ export interface AppContext {
   compose(replyTo?: AppBskyFeedDefs.PostView): void
   quote(post: AppBskyFeedDefs.PostView): void
   openThread(uri: string): void
+  /** Shows someone's profile; takes a DID or handle. */
+  openProfile(actor: string): void
   viewMedia(media: MediaView): void
 }
 

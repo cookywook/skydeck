@@ -2,7 +2,11 @@ import { useMemo, useState } from 'react'
 import { Ctx, useApp, useColumn, useNow } from '../hooks'
 import { itemId, type ColumnConfig } from '../lib/columns'
 import { NotifCard, PostCard } from './PostCard'
+import { Panel } from './Panel'
+import { Profile } from './Profile'
 import { Thread } from './Thread'
+
+type View = { kind: 'thread'; uri: string } | { kind: 'profile'; actor: string }
 
 interface Props {
   config: ColumnConfig
@@ -21,10 +25,18 @@ export function Column({ config, onMove, onRemove }: Props) {
   const { items, fresh, poll, loadMore, loadingMore, hasMore, refresh } = useColumn(session, config)
   const now = useNow(5_000)
 
-  // A clicked post opens its thread inside this column. The trail lets Back
-  // retrace posts opened from within a thread before returning to the column.
-  const [trail, setTrail] = useState<string[]>([])
-  const ctx = useMemo(() => ({ ...app, openThread: (uri: string) => setTrail((t) => [...t, uri]) }), [app])
+  // A clicked post or name opens a thread or profile inside this column. The
+  // trail lets Back retrace each step before returning to the column itself.
+  const [trail, setTrail] = useState<View[]>([])
+  const ctx = useMemo(
+    () => ({
+      ...app,
+      openThread: (uri: string) => setTrail((t) => [...t, { kind: 'thread', uri }]),
+      openProfile: (actor: string) => setTrail((t) => [...t, { kind: 'profile', actor }]),
+    }),
+    [app],
+  )
+  const view = trail[trail.length - 1]
 
   // The health line is the point of this app: a column that has stopped
   // updating must say so rather than quietly showing old posts.
@@ -86,8 +98,16 @@ export function Column({ config, onMove, onRemove }: Props) {
               </button>
             )}
           </div>
-          {trail.length > 0 && (
-            <Thread uri={trail[trail.length - 1]} onBack={() => setTrail((t) => t.slice(0, -1))} onClose={() => setTrail([])} />
+          {view && (
+            <Panel
+              // A fresh panel per step, so each view starts at its own top.
+              key={trail.length}
+              title={view.kind === 'thread' ? 'Thread' : 'Profile'}
+              onBack={() => setTrail((t) => t.slice(0, -1))}
+              onClose={() => setTrail([])}
+            >
+              {view.kind === 'thread' ? <Thread uri={view.uri} /> : <Profile actor={view.actor} />}
+            </Panel>
           )}
         </div>
       </Ctx.Provider>

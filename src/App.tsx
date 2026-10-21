@@ -39,6 +39,7 @@ export function App({ session }: { session: Session }) {
       quote: (quote: AppBskyFeedDefs.PostView) => setDraft({ quote }),
       // Each column supplies its own; outside a column there is nowhere to show a thread.
       openThread: () => {},
+      openProfile: () => {},
       viewMedia: setMedia,
     }),
     [session],
