@@ -452,11 +452,6 @@ main {
   cursor: pointer;
 }
 
-.quote.clickable:hover {
-  border-color: var(--muted);
-  background: rgb(255 255 255 / 3%);
-}
-
 .quote .images img,
 .quote .video img,
 .quote .card img {
