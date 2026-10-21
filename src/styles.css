@@ -163,6 +163,7 @@ main {
 }
 
 .column header {
+  cursor: pointer;
   padding: 8px 10px 6px;
   border-bottom: 1px solid var(--line);
 }

@@ -36,7 +36,16 @@ export function Column({ config, onMove, onRemove }: Props) {
 
   return (
     <section className="column">
-      <header>
+      {/* Clicking the header (but not its buttons) scrolls back to the top of
+          whatever the column is showing: its posts, or an open thread. */}
+      <header
+        title="Back to top"
+        onClick={(e) => {
+          if ((e.target as Element).closest('button')) return
+          const views = e.currentTarget.parentElement?.querySelectorAll('.body-area .scroll')
+          views?.[views.length - 1]?.scrollTo({ top: 0, behavior: 'smooth' })
+        }}
+      >
         <div className="title">
           <h2>{config.title}</h2>
           <span className="tools">
