@@ -217,6 +217,8 @@ main {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Columns only ever scroll up and down. */
+  overflow-x: hidden;
   scrollbar-gutter: stable;
   padding: 6px;
   display: flex;
@@ -313,7 +315,8 @@ button.who:hover strong,
   text-decoration: underline;
 }
 
-button.who:has(> .avatar) {
+/* An avatar on its own; a quoted post's author line holds an avatar and text. */
+button.who:has(> .avatar:only-child) {
   flex: none;
   display: block;
   line-height: 0;
@@ -323,11 +326,20 @@ button.who.names {
   display: flex;
 }
 
+/* A quoted post's author line: long names and handles are cut short with
+   an ellipsis rather than widening the quote past its column. */
 button.who.inline {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
+}
+
+button.who.inline .avatar {
+  flex: none;
 }
 
 .profile {
@@ -444,8 +456,9 @@ button.who.inline {
 }
 
 .names > *,
-.quote .byline > strong,
-.quote .byline > .muted {
+.quote .byline strong,
+.quote .byline .muted {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
