@@ -49,9 +49,12 @@ export function displayName(author: Author): string {
 }
 
 export function Body({ text, facets }: { text: string; facets?: AppBskyRichtextFacet.Main[] }) {
+  const { openProfile } = useApp()
   const out: ReactNode[] = []
   let i = 0
   for (const seg of new RichText({ text, facets }).segments()) {
+    // An @mention opens that profile in the column; ⌘-click still goes to bsky.app.
+    const mention = seg.mention?.did
     const href = seg.link
       ? safeHref(seg.link.uri)
       : seg.mention
@@ -61,7 +64,13 @@ export function Body({ text, facets }: { text: string; facets?: AppBskyRichtextF
           : undefined
     out.push(
       href ? (
-        <a key={i++} href={href} target="_blank" rel="noreferrer noopener">
+        <a
+          key={i++}
+          href={href}
+          target="_blank"
+          rel="noreferrer noopener"
+          onClick={mention ? previewClick(() => openProfile(mention)) : undefined}
+        >
           {seg.text}
         </a>
       ) : (
