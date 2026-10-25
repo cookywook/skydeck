@@ -875,3 +875,27 @@ button.who.inline .avatar {
 .buttons .add-image {
   margin-right: auto;
 }
+
+.attachment .alt {
+  display: flex;
+  gap: 4px;
+}
+
+.attachment .alt button {
+  flex: none;
+  padding: 0 8px;
+  border-color: var(--line);
+}
+
+.api-key {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.api-key p {
+  margin: 0;
+}

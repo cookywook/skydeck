@@ -3,7 +3,7 @@ import { RichText, type AppBskyFeedDefs } from '@atproto/api'
 import { useApp, type Session } from '../hooks'
 import { parseFeedRef, type ColumnConfig } from '../lib/columns'
 import { MAX_IMAGES, postEmbed, prepareImage, type PreparedImage } from '../lib/images'
-import { newId } from '../lib/settings'
+import { loadApiKey, newId, saveApiKey } from '../lib/settings'
 import { Avatar, displayName } from './PostCard'
 
 const MAX_GRAPHEMES = 300
@@ -165,13 +165,18 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
   const [text, setText] = useState('')
   const [images, setImages] = useState<Attachment[]>([])
   const [preparing, setPreparing] = useState(0)
+  const [describing, setDescribing] = useState<string[]>([])
+  const [apiKey, setApiKey] = useState(() => loadApiKey(localStorage))
+  /** The image waiting on an API key before it can be described. */
+  const [needsKey, setNeedsKey] = useState<string | null>(null)
+  const [keyDraft, setKeyDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const picker = useRef<HTMLInputElement>(null)
   const left = MAX_GRAPHEMES - new RichText({ text }).graphemeLength
   const slots = MAX_IMAGES - images.length - preparing
   // A quote or images can go out with no text of their own, as in the Bluesky app.
-  const canSend = !busy && !preparing && (text.trim().length > 0 || !!quote || images.length > 0) && left >= 0
+  const canSend = !busy && !preparing && !describing.length && (text.trim().length > 0 || !!quote || images.length > 0) && left >= 0
 
   const urls = useRef<string[]>([])
   urls.current = images.map((img) => img.url)
@@ -207,6 +212,42 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
 
   const setAlt = (id: string, alt: string) =>
     setImages((list) => list.map((img) => (img.id === id ? { ...img, alt } : img)))
+
+  const describe = async (id: string, key = apiKey) => {
+    const img = images.find((i) => i.id === id)
+    if (!img) return
+    if (!key) {
+      setNeedsKey(id)
+      return
+    }
+    setError('')
+    setDescribing((ids) => [...ids, id])
+    try {
+      // The Anthropic SDK is only loaded once someone asks for alt text.
+      const { describeImage } = await import('../lib/alttext')
+      setAlt(id, await describeImage(key, img.blob, text))
+    } catch (err) {
+      if (err instanceof Error && err.name === 'BadKeyError') {
+        saveApiKey(localStorage, '')
+        setApiKey('')
+        setNeedsKey(id)
+      }
+      setError(errorText(err))
+    } finally {
+      setDescribing((ids) => ids.filter((i) => i !== id))
+    }
+  }
+
+  const saveKey = (e: FormEvent) => {
+    e.preventDefault()
+    const key = keyDraft.trim()
+    if (!key) return
+    saveApiKey(localStorage, key)
+    setApiKey(key)
+    setKeyDraft('')
+    setNeedsKey(null)
+    if (needsKey) describe(needsKey, key)
+  }
 
   const send = async () => {
     if (!canSend) return
@@ -270,14 +311,24 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
                   ×
                 </button>
               </div>
-              <input
-                value={img.alt}
-                onChange={(e) => setAlt(img.id, e.target.value)}
-                placeholder="Alt text"
-                aria-label="Alt text"
-                maxLength={2000}
-                disabled={busy}
-              />
+              <div className="alt">
+                <input
+                  value={img.alt}
+                  onChange={(e) => setAlt(img.id, e.target.value)}
+                  placeholder={describing.includes(img.id) ? 'Describing…' : 'Alt text'}
+                  aria-label="Alt text"
+                  maxLength={2000}
+                  disabled={busy || describing.includes(img.id)}
+                />
+                <button
+                  type="button"
+                  title="Write alt text with Claude"
+                  onClick={() => describe(img.id)}
+                  disabled={busy || describing.includes(img.id)}
+                >
+                  ✨
+                </button>
+              </div>
             </div>
           ))}
           {Array.from({ length: preparing }, (_, i) => (
@@ -286,6 +337,37 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
             </div>
           ))}
         </div>
+      )}
+      {needsKey && (
+        <form className="api-key" onSubmit={saveKey}>
+          <label>
+            Anthropic API key
+            <input
+              type="password"
+              autoFocus
+              value={keyDraft}
+              onChange={(e) => setKeyDraft(e.target.value)}
+              placeholder="sk-ant-…"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
+          <p className="muted small">
+            Alt text is written by Claude using your own{' '}
+            <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer noopener">
+              API key
+            </a>
+            , billed to you. The key stays in this browser, and images go straight to Anthropic.
+          </p>
+          <div className="buttons">
+            <button type="button" onClick={() => setNeedsKey(null)}>
+              Not now
+            </button>
+            <button type="submit" className="primary" disabled={!keyDraft.trim()}>
+              Save and describe
+            </button>
+          </div>
+        </form>
       )}
       {quote && <PostPreview post={quote} />}
       {error && <p className="error">{error}</p>}

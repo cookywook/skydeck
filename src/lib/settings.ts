@@ -56,3 +56,19 @@ export function exportColumns(columns: ColumnConfig[]): string {
 export function newId(): string {
   return Math.random().toString(36).slice(2, 10)
 }
+
+const API_KEY = 'skydeck.anthropicKey'
+
+/** The Anthropic API key used to write alt text, or '' when none is saved. */
+export function loadApiKey(storage: Pick<Storage, 'getItem'>): string {
+  try {
+    return storage.getItem(API_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+export function saveApiKey(storage: Pick<Storage, 'setItem' | 'removeItem'>, key: string) {
+  if (key) storage.setItem(API_KEY, key)
+  else storage.removeItem(API_KEY)
+}

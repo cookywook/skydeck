@@ -18,6 +18,9 @@ Sign in separately on each device. Each one then holds its own login, so they ca
 - Like, repost and reply from any post; **✎** writes a new post (⌘/Ctrl + Enter sends).
 - Attach up to four images to a post or reply with **🖼 Image**, or paste or drop them into the composer.
   They are resized and re-encoded before upload, which also strips location data from photos.
+- **✨** beside an image's alt text asks Claude to write it. This uses your own
+  [Anthropic API key](https://console.anthropic.com/settings/keys), kept in local storage and billed to you;
+  the image goes straight from your browser to Anthropic.
 
 ## What is stored
 
