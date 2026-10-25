@@ -312,7 +312,8 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
                 </button>
               </div>
               <div className="alt">
-                <input
+                <textarea
+                  rows={2}
                   value={img.alt}
                   onChange={(e) => setAlt(img.id, e.target.value)}
                   placeholder={describing.includes(img.id) ? 'Describing…' : 'Alt text'}

@@ -867,9 +867,14 @@ button.who.inline .avatar {
   background: rgb(0 0 0 / 0.85);
 }
 
-.modal .attachment input {
+.modal .attachment textarea {
   padding: 4px 8px;
   font-size: 13px;
+  resize: none;
+  /* Grows with the alt text, up to about eight lines, then scrolls. */
+  field-sizing: content;
+  min-height: calc(2lh + 10px);
+  max-height: calc(8lh + 10px);
 }
 
 .buttons .add-image {
@@ -878,12 +883,13 @@ button.who.inline .avatar {
 
 .attachment .alt {
   display: flex;
+  align-items: flex-start;
   gap: 4px;
 }
 
 .attachment .alt button {
   flex: none;
-  padding: 0 8px;
+  padding: 4px 8px;
   border-color: var(--line);
 }
 
