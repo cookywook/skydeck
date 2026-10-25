@@ -16,6 +16,8 @@ Sign in separately on each device. Each one then holds its own login, so they ca
 - **＋** adds a search or feed column (paste a `bsky.app/profile/…/feed/…` link).
 - **⤓ / ⤒** export and import your columns as a JSON file, to copy them to another device.
 - Like, repost and reply from any post; **✎** writes a new post (⌘/Ctrl + Enter sends).
+- Attach up to four images to a post or reply with **🖼 Image**, or paste or drop them into the composer.
+  They are resized and re-encoded before upload, which also strips location data from photos.
 
 ## What is stored
 
@@ -25,7 +27,7 @@ files and talks directly to Bluesky.
 
 ## Not yet
 
-Posting images or video, in-app video playback, full thread view, multiple accounts, moderation settings,
+Posting video, in-app video playback, full thread view, multiple accounts, moderation settings,
 lists and DMs. Accounts on a self-hosted PDS need the service address in `src/main.tsx` changed.
 
 ## Develop
