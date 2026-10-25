@@ -7,7 +7,8 @@ const CSP = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src https: data:",
+  // blob: shows the composer's thumbnails of images about to be uploaded.
+  "img-src https: data: blob:",
   // hls.js plays video through MediaSource, which uses blob: URLs.
   "media-src https: blob:",
   "connect-src https:",
