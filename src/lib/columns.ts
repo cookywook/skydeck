@@ -57,13 +57,14 @@ export async function fetchColumn(agent: AtpAgent, c: ColumnConfig, cursor?: str
     }
     case 'notifications': {
       const { data } = await agent.listNotifications({ limit: PAGE, cursor })
-      const uris = subjectUris(data.notifications)
+      const reposts = await resolveReposts(agent, repostUris(data.notifications))
+      const uris = [...new Set([...subjectUris(data.notifications), ...reposts.values()])]
       const posts = new Map<string, PostView>()
       for (let i = 0; i < uris.length; i += 25) {
         const res = await agent.getPosts({ uris: uris.slice(i, i + 25) })
         for (const p of res.data.posts) posts.set(p.uri, p)
       }
-      return { items: groupNotifications(data.notifications, posts), cursor: data.cursor }
+      return { items: groupNotifications(data.notifications, posts, reposts), cursor: data.cursor }
     }
   }
 }
@@ -108,12 +109,49 @@ export function subjectUris(notifs: Notification[]): string[] {
   return [...uris]
 }
 
+const REPOST_RECORD = /^at:\/\/([^/]+)\/app\.bsky\.feed\.repost\/([^/]+)$/
+
+/**
+ * The repost records that "liked your repost" / "reposted your repost"
+ * notifications point at. Their reasonSubject is your repost, not the post.
+ */
+export function repostUris(notifs: Notification[]): string[] {
+  return [...new Set(notifs.map((n) => n.reasonSubject).filter((u): u is string => !!u && REPOST_RECORD.test(u)))]
+}
+
+/** Which post each repost record reposted. A repost record never changes, so answers are kept for the session. */
+const repostTargets = new Map<string, string>()
+
+async function resolveReposts(agent: AtpAgent, uris: string[]): Promise<Map<string, string>> {
+  await Promise.all(
+    uris
+      .filter((uri) => !repostTargets.has(uri))
+      .map(async (uri) => {
+        const [, repo, rkey] = uri.match(REPOST_RECORD)!
+        try {
+          const { data } = await agent.com.atproto.repo.getRecord({ repo, collection: 'app.bsky.feed.repost', rkey })
+          const target = (data.value as { subject?: { uri?: string } }).subject?.uri
+          if (target) repostTargets.set(uri, target)
+        } catch {
+          // The repost has since been undone; the notification shows without its post.
+        }
+      }),
+  )
+  return new Map(uris.flatMap((uri) => (repostTargets.has(uri) ? [[uri, repostTargets.get(uri)!] as const] : [])))
+}
+
+const GROUPABLE = new Set(['like', 'repost', 'like-via-repost', 'repost-via-repost'])
+
 /**
  * Replies, mentions and quotes become ordinary posts. Likes and reposts of the
- * same post collapse into one row ("A and 3 others liked your post"), placed
+ * same post (or of the same repost of yours) collapse into one row ("A and 3 others liked your post"), placed
  * where the most recent of them falls.
  */
-export function groupNotifications(notifs: Notification[], posts: Map<string, PostView>): Item[] {
+export function groupNotifications(
+  notifs: Notification[],
+  posts: Map<string, PostView>,
+  reposts: Map<string, string> = new Map(),
+): Item[] {
   const items: Item[] = []
   const groups = new Map<string, Extract<Item, { kind: 'notif' }>>()
   for (const n of notifs) {
@@ -122,7 +160,7 @@ export function groupNotifications(notifs: Notification[], posts: Map<string, Po
       if (post) items.push({ kind: 'post', key: `n:${n.uri}`, post, label: POST_REASONS[n.reason] })
       continue
     }
-    const groupable = n.reason === 'like' || n.reason === 'repost'
+    const groupable = GROUPABLE.has(n.reason)
     const key = groupable ? `n:${n.reason}:${n.reasonSubject}` : `n:${n.uri}`
     const existing = groups.get(key)
     if (existing) {
@@ -135,7 +173,7 @@ export function groupNotifications(notifs: Notification[], posts: Map<string, Po
       reason: n.reason,
       authors: [n.author],
       indexedAt: n.indexedAt,
-      subject: n.reasonSubject ? posts.get(n.reasonSubject) : undefined,
+      subject: n.reasonSubject ? posts.get(reposts.get(n.reasonSubject) ?? n.reasonSubject) : undefined,
     }
     groups.set(key, item)
     items.push(item)

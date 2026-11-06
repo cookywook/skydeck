@@ -458,6 +458,11 @@ export function NotifCard({ item, now, fresh }: { item: Extract<Item, { kind: 'n
         {rest.length > 0 && ` and ${rest.length} other${rest.length > 1 ? 's' : ''}`}{' '}
         {NOTIF_TEXT[item.reason] ?? item.reason}
       </div>
+      {item.reason.endsWith('-via-repost') && item.subject && (
+        <div className="context">
+          ⟳ Your repost of <Who author={item.subject.author}>{displayName(item.subject.author)}</Who>
+        </div>
+      )}
       {subject?.text && <div className="body muted">{subject.text}</div>}
     </article>
   )
