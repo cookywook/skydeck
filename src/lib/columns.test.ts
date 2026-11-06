@@ -6,6 +6,7 @@ import {
   groupNotifications,
   mergeItems,
   parseFeedRef,
+  repostUris,
   relativeTime,
   showInHome,
   subjectUris,
@@ -96,6 +97,23 @@ describe('notifications', () => {
     ])
     const like = items[0]
     expect(like.kind === 'notif' && like.subject?.uri).toBe(`${POST}1`)
+  })
+
+  it('shows the original post for activity on your reposts', () => {
+    const REPOST = 'at://did:plc:me/app.bsky.feed.repost/rp1'
+    const vias = [
+      notif('like-via-repost', 'x', { reasonSubject: REPOST }),
+      notif('like-via-repost', 'z', { reasonSubject: REPOST }),
+      notif('repost-via-repost', 'w', { reasonSubject: REPOST }),
+    ]
+    expect(repostUris(vias)).toEqual([REPOST])
+    expect(subjectUris(vias)).toEqual([])
+    const original = 'at://did:plc:other/app.bsky.feed.post/orig'
+    const items = groupNotifications(vias, new Map([[original, post(original)]]), new Map([[REPOST, original]]))
+    expect(items.map((i) => (i.kind === 'notif' ? `${i.reason}:${i.authors.length}:${i.subject?.uri}` : ''))).toEqual([
+      `like-via-repost:2:${original}`,
+      `repost-via-repost:1:${original}`,
+    ])
   })
 
   it('drops a reply whose post could not be loaded', () => {
