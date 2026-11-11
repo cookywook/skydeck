@@ -38,13 +38,22 @@ export async function prepareImage(file: Blob): Promise<PreparedImage> {
     let side = Math.min(Math.max(bitmap.width, bitmap.height), MAX_SIDE)
     for (let attempt = 0; attempt < 8; attempt++) {
       const { width, height } = fitWithin(bitmap.width, bitmap.height, side)
-      const canvas = new OffscreenCanvas(width, height)
-      canvas.getContext('2d')!.drawImage(bitmap, 0, 0, width, height)
+      const encode = (out: string, quality?: number) => {
+        const canvas = new OffscreenCanvas(width, height)
+        const ctx = canvas.getContext('2d')!
+        // JPEG has no transparency and would turn clear areas black, so they become white.
+        if (out === 'image/jpeg') {
+          ctx.fillStyle = '#fff'
+          ctx.fillRect(0, 0, width, height)
+        }
+        ctx.drawImage(bitmap, 0, 0, width, height)
+        return canvas.convertToBlob({ type: out, quality })
+      }
       // Lossless PNG can only get smaller by becoming JPEG, losing any transparency.
       const lossy = type === 'image/png' ? 'image/jpeg' : type
-      const tries = [{ type }, { type: lossy, quality: 0.85 }, { type: lossy, quality: 0.7 }]
-      for (const options of tries) {
-        const blob = await canvas.convertToBlob(options)
+      const tries: [string, number?][] = [[type], [lossy, 0.85], [lossy, 0.7]]
+      for (const [out, quality] of tries) {
+        const blob = await encode(out, quality)
         if (blob.size <= MAX_BYTES) return { blob, width, height }
       }
       side = Math.round(side * 0.75)

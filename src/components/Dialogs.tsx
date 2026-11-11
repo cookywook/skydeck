@@ -153,8 +153,12 @@ function PostPreview({ post }: { post: AppBskyFeedDefs.PostView }) {
   )
 }
 
+const MAX_ALT = 2000
+
 interface Attachment extends PreparedImage {
   id: string
+  /** The position it was picked in; images finish preparing in any order. */
+  order: number
   /** An object URL for the thumbnail. */
   url: string
   alt: string
@@ -175,6 +179,14 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
   const picker = useRef<HTMLInputElement>(null)
   const left = MAX_GRAPHEMES - new RichText({ text }).graphemeLength
   const slots = MAX_IMAGES - images.length - preparing
+  // Counted outside React state so two pastes in quick succession cannot both claim the last slot.
+  const claimed = useRef(0)
+  const picked = useRef(0)
+  const dirty = text.trim().length > 0 || images.length > 0 || preparing > 0
+  /** Closing by Escape, Cancel or a click outside asks first if there is something to lose. */
+  const close = () => {
+    if (!dirty || window.confirm('Discard this post?')) onClose()
+  }
   // A quote or images can go out with no text of their own, as in the Bluesky app.
   const canSend = !busy && !preparing && !describing.length && (text.trim().length > 0 || !!quote || images.length > 0) && left >= 0
 
@@ -185,16 +197,21 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
   const attach = async (files: File[]) => {
     const wanted = files.filter((f) => f.type.startsWith('image/'))
     if (!wanted.length) return
-    setError(wanted.length > slots ? `A post can have at most ${MAX_IMAGES} images.` : '')
-    const taken = wanted.slice(0, Math.max(slots, 0))
+    const free = Math.max(MAX_IMAGES - claimed.current, 0)
+    setError(wanted.length > free ? `A post can have at most ${MAX_IMAGES} images.` : '')
+    const taken = wanted.slice(0, free).map((file) => ({ file, order: picked.current++ }))
+    claimed.current += taken.length
     setPreparing((n) => n + taken.length)
     await Promise.all(
-      taken.map(async (file) => {
+      taken.map(async ({ file, order }) => {
         try {
           const prepared = await prepareImage(file)
           const url = URL.createObjectURL(prepared.blob)
-          setImages((list) => [...list, { ...prepared, id: newId(), url, alt: '' }])
+          setImages((list) =>
+            [...list, { ...prepared, id: newId(), order, url, alt: '' }].sort((a, b) => a.order - b.order),
+          )
         } catch (err) {
+          claimed.current--
           setError(errorText(err))
         } finally {
           setPreparing((n) => n - 1)
@@ -203,12 +220,13 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
     )
   }
 
-  const remove = (id: string) =>
-    setImages((list) => {
-      const gone = list.find((img) => img.id === id)
-      if (gone) URL.revokeObjectURL(gone.url)
-      return list.filter((img) => img.id !== id)
-    })
+  const remove = (id: string) => {
+    const gone = images.find((img) => img.id === id)
+    if (!gone) return
+    claimed.current--
+    URL.revokeObjectURL(gone.url)
+    setImages((list) => list.filter((img) => img.id !== id))
+  }
 
   const setAlt = (id: string, alt: string) =>
     setImages((list) => list.map((img) => (img.id === id ? { ...img, alt } : img)))
@@ -225,7 +243,8 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
     try {
       // The Anthropic SDK is only loaded once someone asks for alt text.
       const { describeImage } = await import('../lib/alttext')
-      setAlt(id, await describeImage(key, img.blob, text))
+      // Typing is held to the limit by the box itself; a generated description has to be cut to it.
+      setAlt(id, (await describeImage(key, img.blob, text)).slice(0, MAX_ALT))
     } catch (err) {
       if (err instanceof Error && err.name === 'BadKeyError') {
         saveApiKey(localStorage, '')
@@ -282,7 +301,7 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
   return (
     <Modal
       title={replyTo ? 'Reply' : quote ? 'Quote post' : 'New post'}
-      onClose={busy ? undefined : onClose}
+      onClose={busy ? undefined : close}
       onFiles={busy ? undefined : attach}
     >
       {replyTo && <PostPreview post={replyTo} />}
@@ -318,7 +337,7 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
                   onChange={(e) => setAlt(img.id, e.target.value)}
                   placeholder={describing.includes(img.id) ? 'Describing…' : 'Alt text'}
                   aria-label="Alt text"
-                  maxLength={2000}
+                  maxLength={MAX_ALT}
                   disabled={busy || describing.includes(img.id)}
                 />
                 <button
@@ -394,7 +413,7 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
           🖼 Image
         </button>
         <span className={left < 0 ? 'error' : 'muted'}>{left}</span>
-        <button type="button" onClick={onClose} disabled={busy}>
+        <button type="button" onClick={close} disabled={busy}>
           Cancel
         </button>
         <button type="button" className="primary" onClick={send} disabled={!canSend} title="⌘/Ctrl + Enter">

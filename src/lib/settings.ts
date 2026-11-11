@@ -31,8 +31,13 @@ export function parseColumns(json: string): ColumnConfig[] {
   const data: unknown = JSON.parse(json)
   const list = Array.isArray(data) ? data : (data as { columns?: unknown })?.columns
   if (!Array.isArray(list)) throw new Error('No columns found in that file.')
-  return list.map((c: Record<string, unknown>, i) => {
-    const id = typeof c.id === 'string' ? c.id : `col-${i}`
+  const ids = new Set<string>()
+  return list.map((c: Record<string, unknown> | null, i) => {
+    if (!c || typeof c !== 'object') throw new Error(`Column ${i + 1} is not valid.`)
+    // Columns are told apart by id, so a repeated one gets its own.
+    let id = typeof c.id === 'string' && c.id ? c.id : `col-${i}`
+    while (ids.has(id)) id = `${id}-${i}`
+    ids.add(id)
     const title = typeof c.title === 'string' ? c.title : String(c.kind)
     switch (c.kind) {
       case 'home':

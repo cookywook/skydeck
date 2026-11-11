@@ -121,19 +121,23 @@ export function repostUris(notifs: Notification[]): string[] {
 
 /** Which post each repost record reposted. A repost record never changes, so answers are kept for the session. */
 const repostTargets = new Map<string, string>()
+/** Reposts that have been undone, so they are not looked up again on every poll. */
+const repostsGone = new Set<string>()
 
 async function resolveReposts(agent: AtpAgent, uris: string[]): Promise<Map<string, string>> {
   await Promise.all(
     uris
-      .filter((uri) => !repostTargets.has(uri))
+      .filter((uri) => !repostTargets.has(uri) && !repostsGone.has(uri))
       .map(async (uri) => {
         const [, repo, rkey] = uri.match(REPOST_RECORD)!
         try {
           const { data } = await agent.com.atproto.repo.getRecord({ repo, collection: 'app.bsky.feed.repost', rkey })
           const target = (data.value as { subject?: { uri?: string } }).subject?.uri
           if (target) repostTargets.set(uri, target)
-        } catch {
+        } catch (e) {
           // The repost has since been undone; the notification shows without its post.
+          // Any other failure (the network, say) is tried again on the next poll.
+          if ((e as { status?: number }).status === 400) repostsGone.add(uri)
         }
       }),
   )

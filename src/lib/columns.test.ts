@@ -248,6 +248,12 @@ describe('misleadingHost', () => {
 })
 
 describe('column settings', () => {
+  it('gives columns that share an id their own, and rejects entries that are not columns', () => {
+    const cols = parseColumns(JSON.stringify([{ id: 'a', kind: 'home' }, { id: 'a', kind: 'notifications' }, { kind: 'home' }]))
+    expect(new Set(cols.map((c) => c.id)).size).toBe(3)
+    expect(() => parseColumns('[null]')).toThrow('Column 1 is not valid.')
+  })
+
   it('round-trips through export and import', () => {
     const cols = [...defaultColumns(), { id: 's', kind: 'search' as const, title: 'cats', query: 'cats' }]
     expect(parseColumns(exportColumns(cols))).toEqual(cols)
