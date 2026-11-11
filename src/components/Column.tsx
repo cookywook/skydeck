@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Component, useMemo, useState, type ReactNode } from 'react'
 import { Ctx, useApp, useColumn, useNow } from '../hooks'
 import { itemId, type ColumnConfig } from '../lib/columns'
 import { NotifCard, PostCard } from './PostCard'
@@ -19,11 +19,56 @@ function ago(ms: number): string {
   return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h`
 }
 
-export function Column({ config, onMove, onRemove }: Props) {
+/**
+ * Keeps a failure while drawing one column (a post in a shape the app did not expect, say)
+ * from blanking the whole deck.
+ */
+class ColumnBoundary extends Component<{ title: string; onRemove(): void; children: ReactNode }, { error?: Error }> {
+  state: { error?: Error } = {}
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children
+    return (
+      <section className="column">
+        <header>
+          <div className="title">
+            <h2>{this.props.title}</h2>
+          </div>
+          <div className="health error" role="alert">
+            This column stopped working
+          </div>
+        </header>
+        <div className="gap">
+          <span className="muted">{this.state.error.message || 'Something in it could not be shown.'}</span>
+          <button type="button" onClick={() => this.setState({ error: undefined })}>
+            Reload column
+          </button>
+          <button type="button" onClick={this.props.onRemove}>
+            Remove column
+          </button>
+        </div>
+      </section>
+    )
+  }
+}
+
+export function Column(props: Props) {
+  return (
+    <ColumnBoundary title={props.config.title} onRemove={props.onRemove}>
+      <ColumnView {...props} />
+    </ColumnBoundary>
+  )
+}
+
+function ColumnView({ config, onMove, onRemove }: Props) {
   const app = useApp()
   const { session } = app
-  const { items, fresh, poll, loadMore, loadingMore, hasMore, refresh } = useColumn(session, config)
-  const now = useNow(5_000)
+  const { items, fresh, poll, loadMore, loadingMore, hasMore, refresh, fillGap } = useColumn(session, config)
+  const now = useNow()
 
   // A clicked post or name opens a thread or profile inside this column. The
   // trail lets Back retrace each step before returning to the column itself.
@@ -37,14 +82,13 @@ export function Column({ config, onMove, onRemove }: Props) {
     [app],
   )
   const view = trail[trail.length - 1]
+  const shown = items.filter((i) => i.kind === 'post' || i.kind === 'notif').length
 
   // The health line is the point of this app: a column that has stopped
   // updating must say so rather than quietly showing old posts.
-  const health = poll.error
-    ? `${poll.error}${poll.lastSuccess ? ` · last updated ${ago(now - poll.lastSuccess)} ago` : ''}`
-    : poll.lastSuccess
-      ? `updated ${ago(now - poll.lastSuccess)} ago`
-      : 'loading…'
+  // The age changes every few seconds, so only the error is announced to screen readers;
+  // announcing the age too would have every column talking without pause.
+  const age = poll.lastSuccess ? `updated ${ago(now - poll.lastSuccess)} ago` : poll.error ? '' : 'loading…'
 
   return (
     <section className="column">
@@ -75,8 +119,9 @@ export function Column({ config, onMove, onRemove }: Props) {
             </button>
           </span>
         </div>
-        <div className={poll.error ? 'health error' : 'health muted'} role="status">
-          {health}
+        <div className={poll.error ? 'health error' : 'health muted'}>
+          <span role="status">{poll.error}</span>
+          {poll.error && age ? ` · last ${age}` : age}
         </div>
       </header>
       <Ctx.Provider value={ctx}>
@@ -86,13 +131,21 @@ export function Column({ config, onMove, onRemove }: Props) {
             {/* Keyed by state, so a like group that gains someone is highlighted afresh. */}
             {items.map((item) =>
               item.kind === 'post' ? (
-                <PostCard key={itemId(item)} item={item} now={now} fresh={fresh.has(itemId(item))} />
-              ) : (
-                <NotifCard key={itemId(item)} item={item} now={now} fresh={fresh.has(itemId(item))} />
-              ),
+                <PostCard key={itemId(item)} item={item} fresh={fresh.has(itemId(item))} />
+              ) : item.kind === 'notif' ? (
+                <NotifCard key={itemId(item)} item={item} fresh={fresh.has(itemId(item))} />
+              ) : item.kind === 'gap' ? (
+                // Saying so matters more than looking seamless: what is below is older than it appears.
+                <div key={item.key} className="gap">
+                  <span className="muted">More arrived than was loaded, so posts are missing here.</span>
+                  <button type="button" onClick={() => fillGap(item.key)}>
+                    Continue from here
+                  </button>
+                </div>
+              ) : null,
             )}
-            {items.length === 0 && poll.lastSuccess && <p className="empty muted">Nothing here yet.</p>}
-            {hasMore && items.length > 0 && (
+            {shown === 0 && poll.lastSuccess && <p className="empty muted">Nothing here yet.</p>}
+            {hasMore && shown > 0 && (
               <button type="button" className="more" disabled={loadingMore} onClick={loadMore}>
                 {loadingMore ? 'Loading…' : 'Load older'}
               </button>

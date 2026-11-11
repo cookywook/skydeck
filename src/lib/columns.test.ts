@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { AppBskyFeedDefs, AppBskyNotificationListNotifications } from '@atproto/api'
 import {
   Arrivals,
-  appendItems,
+  appendPage,
+  cutAtGap,
+  mergePage,
+  misleadingHost,
+  postTime,
+  olderCursor,
   groupNotifications,
-  mergeItems,
   parseFeedRef,
   repostUris,
   relativeTime,
@@ -47,26 +51,86 @@ function notif(reason: string, who: string, extra: Partial<Notification> = {}): 
   }
 }
 
-const keys = (items: Item[]) => items.map((i) => i.key)
+const keys = (items: { key: string }[]) => items.map((i) => i.key)
 
-describe('mergeItems', () => {
-  it('puts new items on top and keeps older ones once', () => {
-    expect(keys(mergeItems([item('c'), item('b')], [item('b'), item('a')]))).toEqual(['c', 'b', 'a'])
+const page = (cursor: string | undefined, ...ks: string[]) => ({ items: ks.map(item), cursor })
+const chrono = { newestFirst: true }
+
+describe('mergePage', () => {
+  it('puts new items first, drops duplicates, and marks where the page ended', () => {
+    const first = mergePage(page('c1', 'b', 'a'), [], chrono)
+    expect(keys(first)).toEqual(['b', 'a', 'mark:c1'])
+    // The new page's own mark is dropped: the one just below it resumes from the same place.
+    expect(keys(mergePage(page('c2', 'c', 'b'), first, chrono))).toEqual(['c', 'b', 'a', 'mark:c1'])
   })
 
-  it('prefers the fresh copy of an item', () => {
-    const fresh = { ...item('a'), label: 'fresh' }
-    expect(mergeItems([fresh], [item('a')])[0]).toBe(fresh)
+  it('keeps the fresh copy of an item that was already shown', () => {
+    const p = page('c1', 'a')
+    expect(mergePage(p, [item('a')], chrono)[0]).toBe(p.items[0])
   })
 
-  it('caps the list', () => {
-    expect(keys(mergeItems([item('c')], [item('b'), item('a')], 2))).toEqual(['c', 'b'])
+  it('records a gap when a full page shares nothing with what was shown', () => {
+    const old = mergePage(page('c1', 'b', 'a'), [], chrono)
+    expect(keys(mergePage(page('c9', 'z', 'y'), old, chrono))).toEqual(['z', 'y', 'mark:c9', 'gap:c9', 'b', 'a', 'mark:c1'])
+  })
+
+  it('records no gap in a ranked feed, or when the page is all there is', () => {
+    const old = mergePage(page('c1', 'b', 'a'), [], chrono)
+    expect(keys(mergePage(page('c9', 'z'), old, { newestFirst: false }))).not.toContain('gap:c9')
+    expect(keys(mergePage(page(undefined, 'z'), old, chrono))).toEqual(['z', 'b', 'a', 'mark:c1'])
+  })
+
+  it('trims to the cap at a mark, so loading older resumes exactly where the list ends', () => {
+    const run = (from: number, to: number) => Array.from({ length: from - to + 1 }, (_, i) => `p${from - i}`)
+    let list = mergePage(page('after-25', ...run(36, 25)), [], chrono)
+    list = appendPage(list, page('after-13', ...run(24, 13)))
+    list = appendPage(list, page('after-1', ...run(12, 1)))
+    list = mergePage(page('after-31', ...run(42, 31)), list, { newestFirst: true, cap: 30 })
+    // 42 posts are known; the cut falls back from 30 to where the second page ended.
+    expect(keys(list).filter((k) => k.startsWith('p'))).toEqual(run(42, 13))
+    expect(olderCursor(list)).toBe('after-13')
   })
 })
 
-describe('appendItems', () => {
-  it('adds an older page without duplicates', () => {
-    expect(keys(appendItems([item('c'), item('b')], [item('b'), item('a')]))).toEqual(['c', 'b', 'a'])
+describe('appendPage', () => {
+  it('adds only what is not already shown and moves the end of the list', () => {
+    const list = appendPage(mergePage(page('c1', 'c', 'b'), [], chrono), page('c2', 'b', 'a'))
+    expect(keys(list)).toEqual(['c', 'b', 'a', 'mark:c2'])
+    expect(olderCursor(list)).toBe('c2')
+  })
+
+  it('stays at the end once the last page is loaded, even after later polls', () => {
+    let list = appendPage(mergePage(page('c1', 'c', 'b'), [], chrono), page(undefined, 'a'))
+    expect(olderCursor(list)).toBeUndefined()
+    list = mergePage(page('c1', 'c', 'b'), list, chrono)
+    list = mergePage(page('c3', 'd', 'c'), list, chrono)
+    expect(keys(list).at(-1)).toBe('a')
+    expect(olderCursor(list)).toBeUndefined()
+  })
+
+  it('keeps going past a page with nothing new in it', () => {
+    const list = appendPage(mergePage(page('c1', 'b', 'a'), [], chrono), page('c2', 'a'))
+    expect(olderCursor(list)).toBe('c2')
+  })
+})
+
+describe('cutAtGap', () => {
+  it('drops what is below the gap so the missing posts load next', () => {
+    const old = mergePage(page('c1', 'b', 'a'), [], chrono)
+    const list = cutAtGap(mergePage(page('c9', 'z', 'y'), old, chrono), 'gap:c9')
+    expect(keys(list)).toEqual(['z', 'y', 'mark:c9'])
+    expect(olderCursor(list)).toBe('c9')
+  })
+})
+
+describe('marks', () => {
+  it('are thinned out as polls pile them up, keeping the last', () => {
+    let list = mergePage(page('c0', 'a0'), [], chrono)
+    for (let i = 1; i <= 20; i++) list = mergePage(page(`c${i}`, `a${i}`, `a${i - 1}`), list, chrono)
+    const marks = keys(list).filter((k) => k.startsWith('mark:'))
+    expect(marks.length).toBeLessThanOrEqual(3)
+    expect(olderCursor(list)).toBe('c0')
+    expect(keys(list).filter((k) => k.startsWith('a')).length).toBe(21)
   })
 })
 
@@ -156,7 +220,40 @@ describe('relativeTime', () => {
   })
 })
 
+describe('postTime', () => {
+  const indexed = '2026-10-13T12:00:00Z'
+  it('believes a creation time shortly before the post was first seen', () => {
+    expect(postTime('2026-10-13T11:59:30Z', indexed)).toBe('2026-10-13T11:59:30Z')
+  })
+  it('falls back to when the post was first seen for a time in the future or the distant past', () => {
+    expect(postTime('2030-01-01T00:00:00Z', indexed)).toBe(indexed)
+    expect(postTime('2009-01-01T00:00:00Z', indexed)).toBe(indexed)
+    expect(postTime(undefined, indexed)).toBe(indexed)
+  })
+})
+
+describe('misleadingHost', () => {
+  it('names the real host when link text shows another', () => {
+    expect(misleadingHost('bsky.app/settings', 'https://evil.example/login')).toBe('evil.example')
+    expect(misleadingHost('https://www.bank.com', 'https://bank.com.evil.example/')).toBe('bank.com.evil.example')
+  })
+  it('accepts text that agrees with the link, including shortened links', () => {
+    expect(misleadingHost('example.com/a-long-pa…', 'https://www.example.com/a-long-path')).toBeUndefined()
+    expect(misleadingHost('Example.com', 'https://example.com/')).toBeUndefined()
+  })
+  it('ignores text that is not an address', () => {
+    expect(misleadingHost('read this', 'https://example.com/')).toBeUndefined()
+    expect(misleadingHost('e.g. this', 'https://example.com/')).toBeUndefined()
+  })
+})
+
 describe('column settings', () => {
+  it('gives columns that share an id their own, and rejects entries that are not columns', () => {
+    const cols = parseColumns(JSON.stringify([{ id: 'a', kind: 'home' }, { id: 'a', kind: 'notifications' }, { kind: 'home' }]))
+    expect(new Set(cols.map((c) => c.id)).size).toBe(3)
+    expect(() => parseColumns('[null]')).toThrow('Column 1 is not valid.')
+  })
+
   it('round-trips through export and import', () => {
     const cols = [...defaultColumns(), { id: 's', kind: 'search' as const, title: 'cats', query: 'cats' }]
     expect(parseColumns(exportColumns(cols))).toEqual(cols)

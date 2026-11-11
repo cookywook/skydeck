@@ -7,7 +7,7 @@ import { Ctx, useSessionStatus, type Session } from './hooks'
 import type { ColumnConfig } from './lib/columns'
 import { isMuted, setMuted } from './lib/chime'
 import { statusMessage } from './lib/session'
-import { exportColumns, loadColumns, parseColumns, saveColumns } from './lib/settings'
+import { exportColumns, loadColumns, parseColumns, saveApiKey, saveColumns } from './lib/settings'
 
 type Draft = { replyTo?: AppBskyFeedDefs.PostView; quote?: AppBskyFeedDefs.PostView }
 
@@ -57,6 +57,12 @@ export function App({ session }: { session: Session }) {
       return next
     })
 
+  // Signing out also forgets the Anthropic key, so it is not left behind on a shared computer.
+  const signOut = () => {
+    saveApiKey(localStorage, '')
+    void session.logout()
+  }
+
   const download = () => {
     const url = URL.createObjectURL(new Blob([exportColumns(columns)], { type: 'application/json' }))
     const a = document.createElement('a')
@@ -105,7 +111,7 @@ export function App({ session }: { session: Session }) {
           <button type="button" title="Import columns from a file" onClick={() => fileInput.current?.click()}>
             ⤒
           </button>
-          <button type="button" title={`Sign out @${session.handle}`} onClick={() => void session.logout()}>
+          <button type="button" title={`Sign out @${session.handle}`} onClick={signOut}>
             ⏻
           </button>
           <input

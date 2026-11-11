@@ -121,19 +121,23 @@ export function repostUris(notifs: Notification[]): string[] {
 
 /** Which post each repost record reposted. A repost record never changes, so answers are kept for the session. */
 const repostTargets = new Map<string, string>()
+/** Reposts that have been undone, so they are not looked up again on every poll. */
+const repostsGone = new Set<string>()
 
 async function resolveReposts(agent: AtpAgent, uris: string[]): Promise<Map<string, string>> {
   await Promise.all(
     uris
-      .filter((uri) => !repostTargets.has(uri))
+      .filter((uri) => !repostTargets.has(uri) && !repostsGone.has(uri))
       .map(async (uri) => {
         const [, repo, rkey] = uri.match(REPOST_RECORD)!
         try {
           const { data } = await agent.com.atproto.repo.getRecord({ repo, collection: 'app.bsky.feed.repost', rkey })
           const target = (data.value as { subject?: { uri?: string } }).subject?.uri
           if (target) repostTargets.set(uri, target)
-        } catch {
+        } catch (e) {
           // The repost has since been undone; the notification shows without its post.
+          // Any other failure (the network, say) is tried again on the next poll.
+          if ((e as { status?: number }).status === 400) repostsGone.add(uri)
         }
       }),
   )
@@ -219,23 +223,107 @@ export class Arrivals {
   }
 }
 
-/** Newly fetched items go on top; older ones we already had stay below, without duplicates. */
-export function mergeItems(fresh: Item[], old: Item[], cap = MAX_ITEMS): Item[] {
-  const seen = new Set<string>()
-  const out: Item[] = []
-  for (const item of [...fresh, ...old]) {
-    if (seen.has(item.key)) continue
-    seen.add(item.key)
-    out.push(item)
-    if (out.length >= cap) break
-  }
-  return out
+/** Where a fetched page ended: `cursor` continues with what is older than everything above it. Not shown. */
+export interface Mark {
+  kind: 'mark'
+  key: string
+  cursor: string
 }
 
-/** Appends an older page, skipping anything already shown. */
-export function appendItems(old: Item[], more: Item[]): Item[] {
-  const seen = new Set(old.map((i) => i.key))
-  return [...old, ...more.filter((i) => !seen.has(i.key))]
+/** A place where posts were probably missed, for example while the machine was asleep. */
+export interface Gap {
+  kind: 'gap'
+  key: string
+}
+
+/** What a column holds: its items, plus the places a page ended and the places posts are missing. */
+export type Entry = Item | Mark | Gap
+
+/** Marks closer together than this are thinned out; one is enough to resume from. */
+const MARK_SPACING = 10
+
+/** The page's items followed by a mark for where it ended, if anything older exists. */
+function pageEntries(page: Page): Entry[] {
+  return page.cursor ? [...page.items, { kind: 'mark', key: `mark:${page.cursor}`, cursor: page.cursor }] : page.items
+}
+
+/** Drops marks that have another one a few items below them. The last mark, and one above each gap, always survive. */
+function thinMarks(entries: Entry[]): Entry[] {
+  const out: Entry[] = []
+  let since = Infinity
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i]
+    if (e.kind === 'mark') {
+      if (since < MARK_SPACING) continue
+      since = 0
+    } else if (e.kind === 'gap') {
+      // The mark above a gap is the only way to resume across it.
+      since = Infinity
+    } else since++
+    out.push(e)
+  }
+  return out.reverse()
+}
+
+/**
+ * Puts a freshly polled first page on top of what the column already shows, without duplicates.
+ *
+ * In a column that runs newest-first, a full page that shares nothing with what was there means
+ * more arrived than one page holds, so a gap is recorded between the two rather than letting them
+ * look continuous.
+ *
+ * The list is kept to about `cap` items by cutting at a mark, so "Load older" always resumes
+ * exactly where the list ends.
+ */
+export function mergePage(page: Page, old: Entry[], opts: { newestFirst: boolean; cap?: number }): Entry[] {
+  const cap = opts.cap ?? MAX_ITEMS
+  const fresh = pageEntries(page)
+  const had = new Set(old.map((e) => e.key))
+  const missed =
+    opts.newestFirst &&
+    !!page.cursor &&
+    page.items.length > 0 &&
+    old.some((e) => e.kind === 'post' || e.kind === 'notif') &&
+    !page.items.some((i) => had.has(i.key))
+  const seen = new Set(fresh.map((e) => e.key))
+  const rest = old.filter((e) => !seen.has(e.key))
+  const all = thinMarks(missed ? [...fresh, { kind: 'gap', key: `gap:${page.cursor}` }, ...rest] : [...fresh, ...rest])
+
+  let count = 0
+  let lastMark = -1
+  for (let i = 0; i < all.length; i++) {
+    const e = all[i]
+    if (e.kind === 'mark') lastMark = i
+    else if (e.kind !== 'gap' && ++count > cap) {
+      // Over the cap: end at the last mark, or failing that right here (with nothing more to load).
+      return all.slice(0, lastMark >= 0 ? lastMark + 1 : i)
+    }
+  }
+  return all
+}
+
+/** The cursor "Load older" continues from: set only while the list ends where a page ended. */
+export function olderCursor(entries: Entry[]): string | undefined {
+  const last = entries[entries.length - 1]
+  return last?.kind === 'mark' ? last.cursor : undefined
+}
+
+/** Appends an older page, skipping anything already shown. The list then ends where that page did. */
+export function appendPage(old: Entry[], page: Page): Entry[] {
+  const seen = new Set(old.map((e) => e.key))
+  const out = [...old, ...pageEntries(page).filter((e) => !seen.has(e.key))]
+  // The last page can add nothing; the list must still stop ending on a mark.
+  if (!page.cursor) while (out[out.length - 1]?.kind === 'mark') out.pop()
+  return thinMarks(out)
+}
+
+/**
+ * Discards everything below a gap, so the list ends where the page above the gap did and
+ * "Load older" fetches the missing posts next.
+ */
+export function cutAtGap(entries: Entry[], key: string): Entry[] {
+  const at = entries.findIndex((e) => e.key === key)
+  return at < 0 ? entries : entries.slice(0, at)
 }
 
 /**
@@ -253,6 +341,33 @@ export async function parseFeedRef(input: string, resolveHandle: (handle: string
 
 export function postUrl(post: PostView): string {
   return `https://bsky.app/profile/${post.author.handle}/post/${post.uri.split('/').pop()}`
+}
+
+/**
+ * When to say a post was made. The author sets `createdAt` and can claim any time, so it is
+ * believed only when it is a little before the time the network first saw the post.
+ */
+export function postTime(createdAt: string | undefined, indexedAt: string): string {
+  if (!createdAt) return indexedAt
+  const lead = Date.parse(indexedAt) - Date.parse(createdAt)
+  return lead >= 0 && lead < 86_400_000 ? createdAt : indexedAt
+}
+
+/**
+ * The real host of a link whose text names a different one ("bsky.app" pointing at another site),
+ * or undefined when the text is not an address or agrees with the link.
+ */
+export function misleadingHost(text: string, uri: string): string | undefined {
+  const shown = text.trim().match(/^(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?=[/:?#.…]|$)/i)?.[1]
+  if (!shown) return undefined
+  let real: string
+  try {
+    real = new URL(uri).hostname
+  } catch {
+    return undefined
+  }
+  const bare = (h: string) => h.toLowerCase().replace(/^www\./, '')
+  return bare(shown) === bare(real) ? undefined : real
 }
 
 export function relativeTime(iso: string, now: number): string {

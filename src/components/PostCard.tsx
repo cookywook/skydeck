@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from 'react'
+import { memo, useEffect, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import {
   AppBskyEmbedExternal,
   AppBskyEmbedImages,
@@ -9,9 +9,9 @@ import {
   type AppBskyFeedDefs,
   type AppBskyRichtextFacet,
 } from '@atproto/api'
-import { useApp } from '../hooks'
+import { useApp, useNow } from '../hooks'
 import { useEscape } from './Dialogs'
-import { postUrl, relativeTime, type Author, type Item } from '../lib/columns'
+import { misleadingHost, postTime, postUrl, relativeTime, type Author, type Item } from '../lib/columns'
 
 type PostView = AppBskyFeedDefs.PostView
 type PostRecord = { text?: string; facets?: AppBskyRichtextFacet.Main[]; createdAt?: string }
@@ -44,6 +44,11 @@ export function Who({ author, className, children }: { author: Author; className
   )
 }
 
+/** How long ago something happened. Kept apart so the clock re-renders only this text. */
+function Ago({ iso }: { iso: string }) {
+  return <>{relativeTime(iso, useNow())}</>
+}
+
 export function displayName(author: Author): string {
   return author.displayName?.trim() || author.handle
 }
@@ -62,6 +67,8 @@ export function Body({ text, facets }: { text: string; facets?: AppBskyRichtextF
         : seg.tag
           ? `https://bsky.app/hashtag/${encodeURIComponent(seg.tag.tag)}`
           : undefined
+    // Link text is whatever the author typed, so text naming one site over a link to another is called out.
+    const real = seg.link && href ? misleadingHost(seg.text, href) : undefined
     out.push(
       href ? (
         <a
@@ -69,9 +76,11 @@ export function Body({ text, facets }: { text: string; facets?: AppBskyRichtextF
           href={href}
           target="_blank"
           rel="noreferrer noopener"
+          title={seg.link ? href : undefined}
           onClick={mention ? previewClick(() => openProfile(mention)) : undefined}
         >
           {seg.text}
+          {real && <span className="real-host"> [goes to {real}]</span>}
         </a>
       ) : (
         seg.text
@@ -234,8 +243,13 @@ function useToggle(
   const [count, setCount] = useState(initialCount)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
+  // What this button last did, and when. Bluesky's index can lag a few seconds behind a like,
+  // so a poll that still shows the old state must not undo it on screen.
+  const acted = useRef({ at: 0, active: false })
 
   useEffect(() => {
+    const own = acted.current
+    if (Date.now() - own.at < 30_000 && own.active !== !!initial) return
     setUri(initial)
     setCount(initialCount)
   }, [initial, initialCount])
@@ -250,10 +264,12 @@ function useToggle(
         setUri(undefined)
         setCount((n) => Math.max(0, n - 1))
         await remove(uri)
+        acted.current = { at: Date.now(), active: false }
       } else {
         setUri('pending')
         setCount((n) => n + 1)
         setUri((await add()).uri)
+        acted.current = { at: Date.now(), active: true }
       }
     } catch {
       setUri(before.uri)
@@ -377,14 +393,14 @@ function useOpenThread(uri: string | undefined) {
 
 interface PostCardProps {
   item: Extract<Item, { kind: 'post' }>
-  now: number
   /** The post a thread view is centred on: highlighted, and not clickable. */
   current?: boolean
   /** Arrived while the app was open: briefly highlighted. */
   fresh?: boolean
 }
 
-export function PostCard({ item, now, current, fresh }: PostCardProps) {
+/** Memoised: a column re-renders on every poll and clock tick, and most of its posts have not changed. */
+export const PostCard = memo(function PostCard({ item, current, fresh }: PostCardProps) {
   const { post } = item
   const record = post.record as PostRecord
   const href = postUrl(post)
@@ -410,7 +426,7 @@ export function PostCard({ item, now, current, fresh }: PostCardProps) {
           <span className="muted">@{post.author.handle}</span>
         </Who>
         <a className="time muted" href={href} target="_blank" rel="noreferrer noopener" title="Open on bsky.app">
-          {relativeTime(record.createdAt ?? post.indexedAt, now)}
+          <Ago iso={postTime(record.createdAt, post.indexedAt)} />
         </a>
       </div>
       {item.replyTo && (
@@ -423,7 +439,7 @@ export function PostCard({ item, now, current, fresh }: PostCardProps) {
       <Actions post={post} />
     </article>
   )
-}
+})
 
 const NOTIF_TEXT: Record<string, string> = {
   like: 'liked your post',
@@ -434,7 +450,12 @@ const NOTIF_TEXT: Record<string, string> = {
   'repost-via-repost': 'reposted your repost',
 }
 
-export function NotifCard({ item, now, fresh }: { item: Extract<Item, { kind: 'notif' }>; now: number; fresh?: boolean }) {
+interface NotifCardProps {
+  item: Extract<Item, { kind: 'notif' }>
+  fresh?: boolean
+}
+
+export const NotifCard = memo(function NotifCard({ item, fresh }: NotifCardProps) {
   const [first, ...rest] = item.authors
   const subject = item.subject?.record as PostRecord | undefined
   const open = useOpenThread(item.subject?.uri)
@@ -449,7 +470,9 @@ export function NotifCard({ item, now, fresh }: { item: Extract<Item, { kind: 'n
             <Avatar author={a} small />
           </Who>
         ))}
-        <span className="time muted">{relativeTime(item.indexedAt, now)}</span>
+        <span className="time muted">
+          <Ago iso={item.indexedAt} />
+        </span>
       </div>
       <div>
         <Who author={first}>
@@ -466,4 +489,4 @@ export function NotifCard({ item, now, fresh }: { item: Extract<Item, { kind: 'n
       {subject?.text && <div className="body muted">{subject.text}</div>}
     </article>
   )
-}
+})
