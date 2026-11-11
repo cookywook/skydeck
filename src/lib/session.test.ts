@@ -188,7 +188,7 @@ describe('SessionManager', () => {
     const { make, agent } = setup()
     const m = make()
     await m.login('me.test', 'pw')
-    agent.logout = () => agent.persist('expired', undefined)
+    agent.logout = async () => agent.persist('expired', undefined)
     await m.logout()
     await settle()
     expect(m.status).toBe('signed-out')
