@@ -5,6 +5,8 @@ import {
   appendPage,
   cutAtGap,
   mergePage,
+  misleadingHost,
+  postTime,
   olderCursor,
   groupNotifications,
   parseFeedRef,
@@ -215,6 +217,33 @@ describe('relativeTime', () => {
     [-5_000, '0s'],
   ])('%i ms ago is %s', (ms, text) => {
     expect(relativeTime('2026-10-13T12:00:00Z', at + ms)).toBe(text)
+  })
+})
+
+describe('postTime', () => {
+  const indexed = '2026-10-13T12:00:00Z'
+  it('believes a creation time shortly before the post was first seen', () => {
+    expect(postTime('2026-10-13T11:59:30Z', indexed)).toBe('2026-10-13T11:59:30Z')
+  })
+  it('falls back to when the post was first seen for a time in the future or the distant past', () => {
+    expect(postTime('2030-01-01T00:00:00Z', indexed)).toBe(indexed)
+    expect(postTime('2009-01-01T00:00:00Z', indexed)).toBe(indexed)
+    expect(postTime(undefined, indexed)).toBe(indexed)
+  })
+})
+
+describe('misleadingHost', () => {
+  it('names the real host when link text shows another', () => {
+    expect(misleadingHost('bsky.app/settings', 'https://evil.example/login')).toBe('evil.example')
+    expect(misleadingHost('https://www.bank.com', 'https://bank.com.evil.example/')).toBe('bank.com.evil.example')
+  })
+  it('accepts text that agrees with the link, including shortened links', () => {
+    expect(misleadingHost('example.com/a-long-pa…', 'https://www.example.com/a-long-path')).toBeUndefined()
+    expect(misleadingHost('Example.com', 'https://example.com/')).toBeUndefined()
+  })
+  it('ignores text that is not an address', () => {
+    expect(misleadingHost('read this', 'https://example.com/')).toBeUndefined()
+    expect(misleadingHost('e.g. this', 'https://example.com/')).toBeUndefined()
   })
 })
 

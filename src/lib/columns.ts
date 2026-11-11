@@ -339,6 +339,33 @@ export function postUrl(post: PostView): string {
   return `https://bsky.app/profile/${post.author.handle}/post/${post.uri.split('/').pop()}`
 }
 
+/**
+ * When to say a post was made. The author sets `createdAt` and can claim any time, so it is
+ * believed only when it is a little before the time the network first saw the post.
+ */
+export function postTime(createdAt: string | undefined, indexedAt: string): string {
+  if (!createdAt) return indexedAt
+  const lead = Date.parse(indexedAt) - Date.parse(createdAt)
+  return lead >= 0 && lead < 86_400_000 ? createdAt : indexedAt
+}
+
+/**
+ * The real host of a link whose text names a different one ("bsky.app" pointing at another site),
+ * or undefined when the text is not an address or agrees with the link.
+ */
+export function misleadingHost(text: string, uri: string): string | undefined {
+  const shown = text.trim().match(/^(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?=[/:?#.…]|$)/i)?.[1]
+  if (!shown) return undefined
+  let real: string
+  try {
+    real = new URL(uri).hostname
+  } catch {
+    return undefined
+  }
+  const bare = (h: string) => h.toLowerCase().replace(/^www\./, '')
+  return bare(shown) === bare(real) ? undefined : real
+}
+
 export function relativeTime(iso: string, now: number): string {
   const s = Math.max(0, Math.floor((now - Date.parse(iso)) / 1000))
   if (s < 60) return `${s}s`

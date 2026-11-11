@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useApp, useNow } from '../hooks'
+import { useApp } from '../hooks'
 import { flattenThread, type Thread as ThreadData } from '../lib/thread'
 import { PostCard } from './PostCard'
 
@@ -9,7 +9,6 @@ export function Thread({ uri }: { uri: string }) {
   const [thread, setThread] = useState<ThreadData | null>(null)
   const [error, setError] = useState('')
   const focused = useRef<HTMLDivElement>(null)
-  const now = useNow(30_000)
 
   useEffect(() => {
     let live = true
@@ -38,7 +37,7 @@ export function Thread({ uri }: { uri: string }) {
     <>
       {thread.parents.map((post, i) =>
         post ? (
-          <PostCard key={post.uri} item={{ kind: 'post', key: post.uri, post }} now={now} />
+          <PostCard key={post.uri} item={{ kind: 'post', key: post.uri, post }} />
         ) : (
           <p key={i} className="post muted">
             Post unavailable
@@ -46,10 +45,10 @@ export function Thread({ uri }: { uri: string }) {
         ),
       )}
       <div ref={focused}>
-        <PostCard item={{ kind: 'post', key: thread.post.uri, post: thread.post }} now={now} current />
+        <PostCard item={{ kind: 'post', key: thread.post.uri, post: thread.post }} current />
       </div>
       {thread.replies.map((post) => (
-        <PostCard key={post.uri} item={{ kind: 'post', key: post.uri, post }} now={now} />
+        <PostCard key={post.uri} item={{ kind: 'post', key: post.uri, post }} />
       ))}
     </>
   )

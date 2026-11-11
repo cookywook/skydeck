@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { RichText, type AppBskyActorDefs } from '@atproto/api'
-import { useApp, useNow } from '../hooks'
+import { useApp } from '../hooks'
 import { feedItem, type Item } from '../lib/columns'
 import { Body, PostCard, displayName } from './PostCard'
 
@@ -68,7 +68,6 @@ export function Profile({ actor }: { actor: string }) {
   const [error, setError] = useState('')
   const [posts, setPosts] = useState<Item[] | null>(null)
   const [postsError, setPostsError] = useState('')
-  const now = useNow(30_000)
 
   useEffect(() => {
     let live = true
@@ -142,7 +141,7 @@ export function Profile({ actor }: { actor: string }) {
       </section>
       {postsError && <p className="error empty">{postsError}</p>}
       {!posts && !postsError && <p className="muted empty">Loading posts…</p>}
-      {posts?.map((item) => item.kind === 'post' && <PostCard key={item.key} item={item} now={now} />)}
+      {posts?.map((item) => item.kind === 'post' && <PostCard key={item.key} item={item} />)}
       {posts?.length === 0 && <p className="muted empty">No posts yet.</p>}
     </>
   )

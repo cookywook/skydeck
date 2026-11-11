@@ -43,14 +43,36 @@ export function useSessionStatus(session: Session): SessionStatus {
   )
 }
 
-/** Re-renders on an interval so relative times ("12s ago") stay current. */
-export function useNow(intervalMs: number): number {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const h = setInterval(() => setNow(Date.now()), intervalMs)
-    return () => clearInterval(h)
-  }, [intervalMs])
-  return now
+const TICK_MS = 5_000
+let tickNow = Date.now()
+let tickTimer: ReturnType<typeof setInterval> | undefined
+const tickListeners = new Set<() => void>()
+
+function subscribeTick(fn: () => void) {
+  if (!tickTimer) {
+    tickNow = Date.now()
+    tickTimer = setInterval(() => {
+      tickNow = Date.now()
+      for (const l of tickListeners) l()
+    }, TICK_MS)
+  }
+  tickListeners.add(fn)
+  return () => {
+    tickListeners.delete(fn)
+    if (!tickListeners.size) {
+      clearInterval(tickTimer)
+      tickTimer = undefined
+    }
+  }
+}
+
+/**
+ * The current time, re-rendering every few seconds so relative times ("12s ago") stay current.
+ * One shared timer serves every caller, and only the small components that show a time use it,
+ * so a tick does not re-render the posts themselves.
+ */
+export function useNow(): number {
+  return useSyncExternalStore(subscribeTick, () => tickNow)
 }
 
 export function useColumn(session: Session, config: ColumnConfig) {

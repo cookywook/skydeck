@@ -231,6 +231,10 @@ main {
   padding: 24px 0;
 }
 
+.real-host {
+  color: var(--error);
+}
+
 .gap {
   display: flex;
   flex-direction: column;
