@@ -22,7 +22,7 @@ function ago(ms: number): string {
 export function Column({ config, onMove, onRemove }: Props) {
   const app = useApp()
   const { session } = app
-  const { items, fresh, poll, loadMore, loadingMore, hasMore, refresh } = useColumn(session, config)
+  const { items, fresh, poll, loadMore, loadingMore, hasMore, refresh, fillGap } = useColumn(session, config)
   const now = useNow(5_000)
 
   // A clicked post or name opens a thread or profile inside this column. The
@@ -37,6 +37,7 @@ export function Column({ config, onMove, onRemove }: Props) {
     [app],
   )
   const view = trail[trail.length - 1]
+  const shown = items.filter((i) => i.kind === 'post' || i.kind === 'notif').length
 
   // The health line is the point of this app: a column that has stopped
   // updating must say so rather than quietly showing old posts.
@@ -87,12 +88,20 @@ export function Column({ config, onMove, onRemove }: Props) {
             {items.map((item) =>
               item.kind === 'post' ? (
                 <PostCard key={itemId(item)} item={item} now={now} fresh={fresh.has(itemId(item))} />
-              ) : (
+              ) : item.kind === 'notif' ? (
                 <NotifCard key={itemId(item)} item={item} now={now} fresh={fresh.has(itemId(item))} />
-              ),
+              ) : item.kind === 'gap' ? (
+                // Saying so matters more than looking seamless: what is below is older than it appears.
+                <div key={item.key} className="gap">
+                  <span className="muted">More arrived than was loaded, so posts are missing here.</span>
+                  <button type="button" onClick={() => fillGap(item.key)}>
+                    Continue from here
+                  </button>
+                </div>
+              ) : null,
             )}
-            {items.length === 0 && poll.lastSuccess && <p className="empty muted">Nothing here yet.</p>}
-            {hasMore && items.length > 0 && (
+            {shown === 0 && poll.lastSuccess && <p className="empty muted">Nothing here yet.</p>}
+            {hasMore && shown > 0 && (
               <button type="button" className="more" disabled={loadingMore} onClick={loadMore}>
                 {loadingMore ? 'Loading…' : 'Load older'}
               </button>

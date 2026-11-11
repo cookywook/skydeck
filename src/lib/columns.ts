@@ -219,23 +219,107 @@ export class Arrivals {
   }
 }
 
-/** Newly fetched items go on top; older ones we already had stay below, without duplicates. */
-export function mergeItems(fresh: Item[], old: Item[], cap = MAX_ITEMS): Item[] {
-  const seen = new Set<string>()
-  const out: Item[] = []
-  for (const item of [...fresh, ...old]) {
-    if (seen.has(item.key)) continue
-    seen.add(item.key)
-    out.push(item)
-    if (out.length >= cap) break
-  }
-  return out
+/** Where a fetched page ended: `cursor` continues with what is older than everything above it. Not shown. */
+export interface Mark {
+  kind: 'mark'
+  key: string
+  cursor: string
 }
 
-/** Appends an older page, skipping anything already shown. */
-export function appendItems(old: Item[], more: Item[]): Item[] {
-  const seen = new Set(old.map((i) => i.key))
-  return [...old, ...more.filter((i) => !seen.has(i.key))]
+/** A place where posts were probably missed, for example while the machine was asleep. */
+export interface Gap {
+  kind: 'gap'
+  key: string
+}
+
+/** What a column holds: its items, plus the places a page ended and the places posts are missing. */
+export type Entry = Item | Mark | Gap
+
+/** Marks closer together than this are thinned out; one is enough to resume from. */
+const MARK_SPACING = 10
+
+/** The page's items followed by a mark for where it ended, if anything older exists. */
+function pageEntries(page: Page): Entry[] {
+  return page.cursor ? [...page.items, { kind: 'mark', key: `mark:${page.cursor}`, cursor: page.cursor }] : page.items
+}
+
+/** Drops marks that have another one a few items below them. The last mark, and one above each gap, always survive. */
+function thinMarks(entries: Entry[]): Entry[] {
+  const out: Entry[] = []
+  let since = Infinity
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i]
+    if (e.kind === 'mark') {
+      if (since < MARK_SPACING) continue
+      since = 0
+    } else if (e.kind === 'gap') {
+      // The mark above a gap is the only way to resume across it.
+      since = Infinity
+    } else since++
+    out.push(e)
+  }
+  return out.reverse()
+}
+
+/**
+ * Puts a freshly polled first page on top of what the column already shows, without duplicates.
+ *
+ * In a column that runs newest-first, a full page that shares nothing with what was there means
+ * more arrived than one page holds, so a gap is recorded between the two rather than letting them
+ * look continuous.
+ *
+ * The list is kept to about `cap` items by cutting at a mark, so "Load older" always resumes
+ * exactly where the list ends.
+ */
+export function mergePage(page: Page, old: Entry[], opts: { newestFirst: boolean; cap?: number }): Entry[] {
+  const cap = opts.cap ?? MAX_ITEMS
+  const fresh = pageEntries(page)
+  const had = new Set(old.map((e) => e.key))
+  const missed =
+    opts.newestFirst &&
+    !!page.cursor &&
+    page.items.length > 0 &&
+    old.some((e) => e.kind === 'post' || e.kind === 'notif') &&
+    !page.items.some((i) => had.has(i.key))
+  const seen = new Set(fresh.map((e) => e.key))
+  const rest = old.filter((e) => !seen.has(e.key))
+  const all = thinMarks(missed ? [...fresh, { kind: 'gap', key: `gap:${page.cursor}` }, ...rest] : [...fresh, ...rest])
+
+  let count = 0
+  let lastMark = -1
+  for (let i = 0; i < all.length; i++) {
+    const e = all[i]
+    if (e.kind === 'mark') lastMark = i
+    else if (e.kind !== 'gap' && ++count > cap) {
+      // Over the cap: end at the last mark, or failing that right here (with nothing more to load).
+      return all.slice(0, lastMark >= 0 ? lastMark + 1 : i)
+    }
+  }
+  return all
+}
+
+/** The cursor "Load older" continues from: set only while the list ends where a page ended. */
+export function olderCursor(entries: Entry[]): string | undefined {
+  const last = entries[entries.length - 1]
+  return last?.kind === 'mark' ? last.cursor : undefined
+}
+
+/** Appends an older page, skipping anything already shown. The list then ends where that page did. */
+export function appendPage(old: Entry[], page: Page): Entry[] {
+  const seen = new Set(old.map((e) => e.key))
+  const out = [...old, ...pageEntries(page).filter((e) => !seen.has(e.key))]
+  // The last page can add nothing; the list must still stop ending on a mark.
+  if (!page.cursor) while (out[out.length - 1]?.kind === 'mark') out.pop()
+  return thinMarks(out)
+}
+
+/**
+ * Discards everything below a gap, so the list ends where the page above the gap did and
+ * "Load older" fetches the missing posts next.
+ */
+export function cutAtGap(entries: Entry[], key: string): Entry[] {
+  const at = entries.findIndex((e) => e.key === key)
+  return at < 0 ? entries : entries.slice(0, at)
 }
 
 /**

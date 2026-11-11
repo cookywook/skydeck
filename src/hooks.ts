@@ -1,6 +1,16 @@
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { AppBskyFeedDefs, AtpAgent } from '@atproto/api'
-import { Arrivals, appendItems, fetchColumn, mergeItems, pollInterval, type ColumnConfig, type Item } from './lib/columns'
+import {
+  Arrivals,
+  appendPage,
+  cutAtGap,
+  fetchColumn,
+  mergePage,
+  olderCursor,
+  pollInterval,
+  type ColumnConfig,
+  type Entry,
+} from './lib/columns'
 import { playChime } from './lib/chime'
 import { Poller, watchWake, type PollState } from './lib/poller'
 import type { SessionManager, SessionStatus } from './lib/session'
@@ -44,11 +54,10 @@ export function useNow(intervalMs: number): number {
 }
 
 export function useColumn(session: Session, config: ColumnConfig) {
-  const [items, setItems] = useState<Item[]>([])
+  const [items, setItems] = useState<Entry[]>([])
   const [poll, setPoll] = useState<PollState>({ loading: true })
   const [loadingMore, setLoadingMore] = useState(false)
   const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set())
-  const cursor = useRef<string | undefined>(undefined)
   const poller = useRef<Poller | null>(null)
   const source = JSON.stringify(config)
 
@@ -56,7 +65,6 @@ export function useColumn(session: Session, config: ColumnConfig) {
     let live = true
     setItems([])
     setFresh(new Set())
-    cursor.current = undefined
     // Only notifications announce arrivals; a busy timeline would never stop.
     const arrivals = config.kind === 'notifications' ? new Arrivals() : null
     const p = new Poller(async () => {
@@ -69,8 +77,8 @@ export function useColumn(session: Session, config: ColumnConfig) {
         setFresh((old) => new Set([...old, ...added]))
         playChime()
       }
-      setItems((old) => mergeItems(page.items, old))
-      cursor.current ??= page.cursor
+      // A feed ranks its posts however it likes, so a page of unfamiliar posts is not a gap there.
+      setItems((old) => mergePage(page, old, { newestFirst: config.kind !== 'feed' }))
     }, pollInterval(config))
     p.onChange = (s) => live && setPoll(s)
     p.start()
@@ -89,13 +97,15 @@ export function useColumn(session: Session, config: ColumnConfig) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, source])
 
+  // Where the list ends decides what "Load older" fetches, so trimming the list or
+  // reaching the last page can never leave a hole or start again from the top.
+  const cursor = olderCursor(items)
   const loadMore = async () => {
-    if (loadingMore || !cursor.current) return
+    if (loadingMore || !cursor) return
     setLoadingMore(true)
     try {
-      const page = await fetchColumn(session.agent, config, cursor.current)
-      cursor.current = page.cursor
-      setItems((old) => appendItems(old, page.items))
+      const page = await fetchColumn(session.agent, config, cursor)
+      setItems((old) => appendPage(old, page))
     } catch {
       // The header already shows connection problems; the button stays for a retry.
     } finally {
@@ -108,8 +118,10 @@ export function useColumn(session: Session, config: ColumnConfig) {
     fresh,
     poll,
     loadingMore,
-    hasMore: !!cursor.current,
+    hasMore: !!cursor,
     loadMore,
+    /** Drops what is below a gap, so the missing posts are what loads next. */
+    fillGap: (key: string) => setItems((old) => cutAtGap(old, key)),
     refresh: () => poller.current?.poke(),
   }
 }
