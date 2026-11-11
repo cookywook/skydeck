@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AtpPersistSessionHandler, AtpSessionData } from '@atproto/api'
+import { AtpAgent, type AtpPersistSessionHandler, type AtpSessionData } from '@atproto/api'
 import { SessionManager, SessionStore, type AgentLike } from './session'
 
 function memoryStorage() {
@@ -21,6 +21,7 @@ class FakeAgent implements AgentLike {
   online = true
   resumed: string[] = []
   persist!: AtpPersistSessionHandler
+  logout?: () => Promise<unknown>
 
   async login() {
     const s = sess('fresh-login')
@@ -181,5 +182,88 @@ describe('SessionManager', () => {
     await m.login('me.test', 'pw')
     await m.logout()
     expect(seen).toEqual(['signed-out', 'ok', 'signed-out'])
+  })
+
+  it('stays signed out when the agent reports its own sign-out as expired', async () => {
+    const { make, agent } = setup()
+    const m = make()
+    await m.login('me.test', 'pw')
+    agent.logout = () => agent.persist('expired', undefined)
+    await m.logout()
+    await settle()
+    expect(m.status).toBe('signed-out')
+  })
+})
+
+/** The real agent against a fake server, with windows that share storage and hear each other's changes. */
+function browser() {
+  let issued = 0
+  let refreshes = 0
+  const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } })
+  const fetch = async (input: RequestInfo | URL) => {
+    await new Promise((r) => setTimeout(r, 1))
+    const path = new URL(input instanceof Request ? input.url : input).pathname
+    if (!path.endsWith('refreshSession')) return json({})
+    refreshes++
+    const refreshJwt = `r${++issued}`
+    return json({ ...sess(refreshJwt), emailConfirmed: true, didDoc: {} })
+  }
+  const data = new Map<string, string>([['skydeck.session', JSON.stringify(sess('r0'))]])
+  const windows: { storage: object; m: SessionManager<AtpAgent> }[] = []
+  const open = () => {
+    const changed = () => {
+      for (const w of windows) if (w.storage !== storage) setTimeout(() => void w.m.syncFromStore(), 0)
+    }
+    const storage = {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        if (data.get(k) === v) return
+        data.set(k, v)
+        if (k === 'skydeck.session') changed()
+      },
+      removeItem: (k: string) => {
+        if (data.delete(k) && k === 'skydeck.session') changed()
+      },
+    }
+    const m = new SessionManager(
+      new SessionStore(storage),
+      (persistSession) => new AtpAgent({ service: 'https://pds.test', persistSession, fetch }),
+      (agent, tokens) => {
+        agent.sessionManager.session = tokens
+      },
+    )
+    windows.push({ storage, m })
+    return m
+  }
+  return { open, refreshes: () => refreshes }
+}
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+describe('SessionManager with the real agent', () => {
+  it('does not renew the login back and forth between two windows', async () => {
+    const b = browser()
+    const first = b.open()
+    await first.start()
+    const second = b.open()
+    await second.start()
+    await wait(100)
+    // One renewal as each window starts, and none in answer to the other's.
+    expect(b.refreshes()).toBe(2)
+    expect([first.status, second.status]).toEqual(['ok', 'ok'])
+    expect(first.agent.session?.refreshJwt).toBe('r2')
+    expect(second.agent.session?.refreshJwt).toBe('r2')
+  })
+
+  it('ends signed out, in every window, after signing out', async () => {
+    const b = browser()
+    const first = b.open()
+    await first.start()
+    const second = b.open()
+    await second.start()
+    await wait(20)
+    await first.logout()
+    await wait(20)
+    expect([first.status, second.status]).toEqual(['signed-out', 'signed-out'])
   })
 })

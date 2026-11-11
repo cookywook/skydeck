@@ -13,9 +13,19 @@ const SERVICE = 'https://bsky.social'
 const session = new SessionManager(
   new SessionStore(localStorage),
   (persistSession) => new AtpAgent({ service: SERVICE, persistSession }),
+  (agent, tokens) => {
+    agent.sessionManager.session = tokens
+  },
 )
-void session.start()
-armChime()
+
+// Inside another site's frame the deck could be overlaid to trick clicks on Like,
+// Repost or Follow. A static page cannot send the header that forbids framing,
+// so the app declines to start there.
+const framed = window.top !== window.self
+if (!framed) {
+  void session.start()
+  armChime()
+}
 
 // Lets the stylesheet hold a new notification's highlight until the window is actually in view.
 const markHidden = () => document.documentElement.toggleAttribute('data-hidden', document.visibilityState !== 'visible')
@@ -23,7 +33,11 @@ document.addEventListener('visibilitychange', markHidden)
 markHidden()
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App session={session} />
-  </StrictMode>,
+  framed ? (
+    <p className="splash muted">skydeck does not run inside another page.</p>
+  ) : (
+    <StrictMode>
+      <App session={session} />
+    </StrictMode>
+  ),
 )

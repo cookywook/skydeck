@@ -53,6 +53,7 @@ export class SessionManager<A extends AgentLike> {
 
   private held: AtpSessionData | null = null
   private recovering = false
+  private loggingOut = false
   private sawNetworkError = false
   private resuming: Promise<void> | null = null
   private listeners = new Set<() => void>()
@@ -60,6 +61,11 @@ export class SessionManager<A extends AgentLike> {
   constructor(
     private store: SessionStore,
     makeAgent: (persist: AtpPersistSessionHandler) => A,
+    /**
+     * Hands the agent tokens another window has already renewed, without contacting the server.
+     * Without it every change is resumed, which renews the login again.
+     */
+    private adopt?: (agent: A, session: AtpSessionData) => void,
   ) {
     this.agent = makeAgent((evt, session) => this.onPersist(evt, session))
   }
@@ -92,10 +98,14 @@ export class SessionManager<A extends AgentLike> {
     this.store.clear()
     this.held = null
     this.setStatus('signed-out')
+    // The agent reports its own sign-out as 'expired', which is not a login to recover.
+    this.loggingOut = true
     try {
       await this.agent.logout?.()
     } catch {
       // The server-side session lapses on its own if this fails.
+    } finally {
+      this.loggingOut = false
     }
   }
 
@@ -126,7 +136,17 @@ export class SessionManager<A extends AgentLike> {
       }
       return
     }
-    if (saved.refreshJwt !== this.held?.refreshJwt) await this.resume(saved)
+    if (saved.refreshJwt === this.held?.refreshJwt) return
+    // Resuming renews the login and stores new tokens, which the other window
+    // would then see as a change of its own: two windows would renew forever.
+    // So tokens for the account already in use here are simply taken over.
+    const inUse = this.status === 'ok' || this.status === 'offline'
+    if (this.adopt && inUse && !this.resuming && saved.did === this.held?.did) {
+      this.held = saved
+      this.adopt(this.agent, saved)
+      return
+    }
+    await this.resume(saved)
   }
 
   private resume(session: AtpSessionData): Promise<void> {
@@ -162,7 +182,7 @@ export class SessionManager<A extends AgentLike> {
         this.setStatus('offline')
         break
       case 'expired':
-        void this.recover()
+        if (!this.loggingOut) void this.recover()
         break
       case 'create-failed':
         break
