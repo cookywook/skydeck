@@ -174,6 +174,8 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
   /** The image waiting on an API key before it can be described. */
   const [needsKey, setNeedsKey] = useState<string | null>(null)
   const [keyDraft, setKeyDraft] = useState('')
+  /** Whether the key form is open to replace or remove a saved key. */
+  const [editingKey, setEditingKey] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const picker = useRef<HTMLInputElement>(null)
@@ -265,7 +267,20 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
     setApiKey(key)
     setKeyDraft('')
     setNeedsKey(null)
+    setEditingKey(false)
     if (needsKey) describe(needsKey, key)
+  }
+
+  const closeKeyForm = () => {
+    setNeedsKey(null)
+    setEditingKey(false)
+    setKeyDraft('')
+  }
+
+  const removeKey = () => {
+    saveApiKey(localStorage, '')
+    setApiKey('')
+    closeKeyForm()
   }
 
   const send = async () => {
@@ -358,7 +373,14 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
           ))}
         </div>
       )}
-      {needsKey && (
+      {images.length > 0 && apiKey && !needsKey && !editingKey && (
+        <p className="muted small">
+          <button type="button" className="link" onClick={() => setEditingKey(true)}>
+            Change API key
+          </button>
+        </p>
+      )}
+      {(needsKey || editingKey) && (
         <form className="api-key" onSubmit={saveKey}>
           <label>
             Anthropic API key
@@ -380,11 +402,16 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
             , billed to you. The key stays in this browser, and images go straight to Anthropic.
           </p>
           <div className="buttons">
-            <button type="button" onClick={() => setNeedsKey(null)}>
-              Not now
+            {editingKey && apiKey && (
+              <button type="button" onClick={removeKey}>
+                Remove key
+              </button>
+            )}
+            <button type="button" onClick={closeKeyForm}>
+              {editingKey ? 'Cancel' : 'Not now'}
             </button>
             <button type="submit" className="primary" disabled={!keyDraft.trim()}>
-              Save and describe
+              {needsKey ? 'Save and describe' : 'Save key'}
             </button>
           </div>
         </form>
