@@ -373,7 +373,7 @@ export function Composer({ replyTo, quote, onClose }: ComposerProps) {
           ))}
         </div>
       )}
-      {images.length > 0 && apiKey && !needsKey && !editingKey && (
+      {apiKey && !needsKey && !editingKey && (
         <p className="muted small">
           <button type="button" className="link" onClick={() => setEditingKey(true)}>
             Change API key
