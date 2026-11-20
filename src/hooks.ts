@@ -9,8 +9,10 @@ import {
   olderCursor,
   pollInterval,
   type ColumnConfig,
+  itemId,
   type Entry,
 } from './lib/columns'
+import { showAlert } from './lib/alerts'
 import { playChime } from './lib/chime'
 import { Poller, watchWake, type PollState } from './lib/poller'
 import type { SessionManager, SessionStatus } from './lib/session'
@@ -98,6 +100,8 @@ export function useColumn(session: Session, config: ColumnConfig) {
       if (added.length) {
         setFresh((old) => new Set([...old, ...added]))
         playChime()
+        const ids = new Set(added)
+        showAlert(page.items.filter((i) => ids.has(itemId(i))))
       }
       // A feed ranks its posts however it likes, so a page of unfamiliar posts is not a gap there.
       setItems((old) => mergePage(page, old, { newestFirst: config.kind !== 'feed' }))
