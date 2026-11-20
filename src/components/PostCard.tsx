@@ -11,7 +11,7 @@ import {
 } from '@atproto/api'
 import { useApp, useNow } from '../hooks'
 import { useEscape } from './Dialogs'
-import { misleadingHost, postTime, postUrl, relativeTime, type Author, type Item } from '../lib/columns'
+import { misleadingHost, NOTIF_TEXT, postTime, postUrl, relativeTime, type Author, type Item } from '../lib/columns'
 
 type PostView = AppBskyFeedDefs.PostView
 type PostRecord = { text?: string; facets?: AppBskyRichtextFacet.Main[]; createdAt?: string }
@@ -440,15 +440,6 @@ export const PostCard = memo(function PostCard({ item, current, fresh }: PostCar
     </article>
   )
 })
-
-const NOTIF_TEXT: Record<string, string> = {
-  like: 'liked your post',
-  repost: 'reposted your post',
-  follow: 'followed you',
-  'starterpack-joined': 'joined via your starter pack',
-  'like-via-repost': 'liked your repost',
-  'repost-via-repost': 'reposted your repost',
-}
 
 interface NotifCardProps {
   item: Extract<Item, { kind: 'notif' }>

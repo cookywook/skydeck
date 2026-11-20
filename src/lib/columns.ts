@@ -99,6 +99,16 @@ const POST_REASONS: Record<string, string> = {
   quote: 'quoted you',
 }
 
+/** How a grouped notification reads after the names of who did it. */
+export const NOTIF_TEXT: Record<string, string> = {
+  like: 'liked your post',
+  repost: 'reposted your post',
+  follow: 'followed you',
+  'starterpack-joined': 'joined via your starter pack',
+  'like-via-repost': 'liked your repost',
+  'repost-via-repost': 'reposted your repost',
+}
+
 /** The post each notification is about: the liked/reposted post, or the reply/mention/quote itself. */
 export function subjectUris(notifs: Notification[]): string[] {
   const uris = new Set<string>()
