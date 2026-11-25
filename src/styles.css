@@ -260,6 +260,9 @@ main {
   gap: 5px;
   min-width: 0;
   overflow-wrap: anywhere;
+  /* Cards scrolled out of view skip layout and paint; the browser remembers their last height. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
 }
 
 .post.clickable {

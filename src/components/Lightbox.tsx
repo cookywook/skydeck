@@ -83,7 +83,8 @@ function Video({ media }: { media: Extract<MediaView, { kind: 'video' }> }) {
           else setError('This browser cannot play Bluesky videos.')
           return
         }
-        const hls = new Hls({ enableWorker: false })
+        // hls.js keeps every second already played unless told otherwise; 30s either side is plenty.
+        const hls = new Hls({ enableWorker: false, backBufferLength: 30, maxBufferLength: 30 })
         hls.on(Hls.Events.ERROR, (_e, data) => data.fatal && setError('The video could not be loaded.'))
         hls.loadSource(media.playlist)
         hls.attachMedia(video)

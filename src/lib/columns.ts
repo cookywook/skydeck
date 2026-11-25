@@ -99,6 +99,16 @@ const POST_REASONS: Record<string, string> = {
   quote: 'quoted you',
 }
 
+/** How a grouped notification reads after the names of who did it. */
+export const NOTIF_TEXT: Record<string, string> = {
+  like: 'liked your post',
+  repost: 'reposted your post',
+  follow: 'followed you',
+  'starterpack-joined': 'joined via your starter pack',
+  'like-via-repost': 'liked your repost',
+  'repost-via-repost': 'reposted your repost',
+}
+
 /** The post each notification is about: the liked/reposted post, or the reply/mention/quote itself. */
 export function subjectUris(notifs: Notification[]): string[] {
   const uris = new Set<string>()
@@ -196,13 +206,26 @@ export function itemId(item: Item): string {
 }
 
 /**
+ * Drops highlighted ids whose items are no longer in the list, so the set stays as small as
+ * the list. Returns `fresh` itself when nothing changes, so React skips the update.
+ */
+export function keepFresh(fresh: ReadonlySet<string>, entries: readonly Entry[]): ReadonlySet<string> {
+  if (!fresh.size) return fresh
+  const present = new Set(
+    entries.flatMap((e) => (e.kind === 'post' || e.kind === 'notif' ? [itemId(e)] : [])),
+  )
+  const kept = [...fresh].filter((id) => present.has(id))
+  return kept.length === fresh.size ? fresh : new Set(kept)
+}
+
+/**
  * Tracks which items have arrived since the column was first loaded. The
  * first page only sets the baseline. After that an item counts as new when it
- * has not been seen and is more recent than everything seen before, so an old
- * item sliding back into the page is not announced.
+ * is more recent than everything seen before, so an old item sliding back into
+ * the page is not announced. Every item already seen is no newer than that, so
+ * only the newest time is kept, not a list of ids that would grow all session.
  */
 export class Arrivals {
-  private seen = new Set<string>()
   private newest = ''
   private primed = false
 
@@ -211,10 +234,8 @@ export class Arrivals {
     const fresh: string[] = []
     let newest = this.newest
     for (const item of items) {
-      const id = itemId(item)
       const time = itemTime(item)
-      if (this.primed && !this.seen.has(id) && time > this.newest) fresh.push(id)
-      this.seen.add(id)
+      if (this.primed && time > this.newest) fresh.push(itemId(item))
       if (time > newest) newest = time
     }
     this.newest = newest

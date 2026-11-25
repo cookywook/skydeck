@@ -5,6 +5,7 @@ import { AddColumn, Composer, Login } from './components/Dialogs'
 import { Lightbox, type MediaView } from './components/Lightbox'
 import { Ctx, useSessionStatus, type Session } from './hooks'
 import type { ColumnConfig } from './lib/columns'
+import { alertsEnabled, alertsSupported, setAlertsEnabled } from './lib/alerts'
 import { isMuted, setMuted } from './lib/chime'
 import { statusMessage } from './lib/session'
 import { exportColumns, loadColumns, parseColumns, saveApiKey, saveColumns } from './lib/settings'
@@ -18,6 +19,7 @@ export function App({ session }: { session: Session }) {
   const [adding, setAdding] = useState(false)
   const [notice, setNotice] = useState('')
   const [muted, setMutedState] = useState(isMuted)
+  const [alerts, setAlertsState] = useState(alertsEnabled)
   const [media, setMedia] = useState<MediaView | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -104,6 +106,23 @@ export function App({ session }: { session: Session }) {
           >
             {muted ? '🔕' : '🔔'}
           </button>
+          {alertsSupported() && (
+            <button
+              type="button"
+              title={alerts ? 'Desktop alerts are on' : 'Desktop alerts are off'}
+              aria-pressed={alerts}
+              className={alerts ? '' : 'dim'}
+              onClick={async () => {
+                const on = await setAlertsEnabled(!alerts)
+                setAlertsState(on)
+                if (!alerts && !on)
+                  setNotice('Your browser is blocking notifications for this site. Allow them in its site settings, then try again.')
+                else setNotice('')
+              }}
+            >
+              💬
+            </button>
+          )}
           <span className="spacer" />
           <button type="button" title="Export columns to a file" onClick={download}>
             ⤓

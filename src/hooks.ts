@@ -9,8 +9,11 @@ import {
   olderCursor,
   pollInterval,
   type ColumnConfig,
+  itemId,
+  keepFresh,
   type Entry,
 } from './lib/columns'
+import { showAlert } from './lib/alerts'
 import { playChime } from './lib/chime'
 import { Poller, watchWake, type PollState } from './lib/poller'
 import type { SessionManager, SessionStatus } from './lib/session'
@@ -98,6 +101,8 @@ export function useColumn(session: Session, config: ColumnConfig) {
       if (added.length) {
         setFresh((old) => new Set([...old, ...added]))
         playChime()
+        const ids = new Set(added)
+        showAlert(page.items.filter((i) => ids.has(itemId(i))))
       }
       // A feed ranks its posts however it likes, so a page of unfamiliar posts is not a gap there.
       setItems((old) => mergePage(page, old, { newestFirst: config.kind !== 'feed' }))
@@ -118,6 +123,9 @@ export function useColumn(session: Session, config: ColumnConfig) {
     // `source` captures every field of `config`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, source])
+
+  // Items that fall off the end of the list take their highlight with them.
+  useEffect(() => setFresh((old) => keepFresh(old, items)), [items])
 
   // Where the list ends decides what "Load older" fetches, so trimming the list or
   // reaching the last page can never leave a hole or start again from the top.

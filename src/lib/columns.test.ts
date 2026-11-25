@@ -3,6 +3,8 @@ import type { AppBskyFeedDefs, AppBskyNotificationListNotifications } from '@atp
 import {
   Arrivals,
   appendPage,
+  itemId,
+  keepFresh,
   cutAtGap,
   mergePage,
   misleadingHost,
@@ -362,9 +364,31 @@ describe('Arrivals', () => {
     expect(a.note([like('a', '2026-10-13T12:09:00Z', 'y', 'x')])).toEqual(['n:like:a@2026-10-13T12:09:00Z'])
   })
 
+  it('does not announce an item that left the page and came back', () => {
+    const a = new Arrivals()
+    const old = like('a', '2026-10-13T12:00:00Z', 'x')
+    a.note([old])
+    a.note([like('b', '2026-10-13T12:05:00Z', 'y')])
+    expect(a.note([old])).toEqual([])
+  })
+
   it('ignores an older item that slides into the page', () => {
     const a = new Arrivals()
     a.note([like('b', '2026-10-13T12:05:00Z', 'y')])
     expect(a.note([like('a', '2026-10-13T11:00:00Z', 'x')])).toEqual([])
+  })
+})
+
+describe('keepFresh', () => {
+  it('drops ids whose items have left the list', () => {
+    const kept = item(`${POST}1`)
+    const fresh = new Set([itemId(kept), itemId(item(`${POST}2`))])
+    expect([...keepFresh(fresh, [kept, { kind: 'gap', key: 'gap:x' }])]).toEqual([itemId(kept)])
+  })
+
+  it('returns the same set when nothing is dropped', () => {
+    const kept = item(`${POST}1`)
+    const fresh = new Set([itemId(kept)])
+    expect(keepFresh(fresh, [kept])).toBe(fresh)
   })
 })
